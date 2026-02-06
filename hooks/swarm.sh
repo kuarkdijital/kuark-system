@@ -149,6 +149,16 @@ swarm_task() {
             task_id=$(printf "TASK-%03d" "$counter")
             local task_file="$SWARM_DIR/tasks/${task_id}.task.md"
 
+            # Determine current sprint name
+            local current_sprint_name
+            current_sprint_name=$(jq -r '.name // ""' "$SWARM_DIR/current-sprint.json" 2>/dev/null)
+            local current_sprint_status
+            current_sprint_status=$(jq -r '.status' "$SWARM_DIR/current-sprint.json" 2>/dev/null)
+            local sprint_label="Belirtilmedi"
+            if [ "$current_sprint_status" = "active" ] && [ -n "$current_sprint_name" ] && [ "$current_sprint_name" != "null" ]; then
+                sprint_label="$current_sprint_name"
+            fi
+
             cat > "$task_file" << EOF
 # ${task_id}: ${title}
 
@@ -157,6 +167,7 @@ swarm_task() {
 - **Atanan:** ${assignee}
 - **Durum:** planned
 - **Oncelik:** ${priority}
+- **Sprint:** ${sprint_label}
 - **Olusturma:** $(date -u +%Y-%m-%dT%H:%M:%SZ)
 - **Guncelleme:** $(date -u +%Y-%m-%dT%H:%M:%SZ)
 
@@ -183,7 +194,16 @@ swarm_task() {
 - $(date -u +%Y-%m-%dT%H:%M:%SZ) | created | ${assignee} | Task olusturuldu
 EOF
 
-            echo -e "${GREEN}[SWARM]${NC} Created: ${task_id} - ${title} -> ${assignee}"
+            # Add task to current sprint if active
+            if [ "$current_sprint_status" = "active" ]; then
+                jq --arg tid "$task_id" '
+                  .tasks += [$tid] |
+                  .metrics.planned += 1
+                ' "$SWARM_DIR/current-sprint.json" > "$SWARM_DIR/current-sprint.json.tmp"
+                mv "$SWARM_DIR/current-sprint.json.tmp" "$SWARM_DIR/current-sprint.json"
+            fi
+
+            echo -e "${GREEN}[SWARM]${NC} Created: ${task_id} - ${title} -> ${assignee}${current_sprint_status:+ (${sprint_label})}"
             ;;
 
         update)
@@ -201,6 +221,10 @@ EOF
                 return 1
             fi
 
+            # Get old status before updating
+            local old_status
+            old_status=$(grep "Durum:\*\*" "$task_file" | sed 's/.*\*\* //')
+
             # Update status in task file
             sed -i.bak "s/- \*\*Durum:\*\* .*/- **Durum:** ${new_status}/" "$task_file"
             sed -i.bak "s/- \*\*Guncelleme:\*\* .*/- **Guncelleme:** $(date -u +%Y-%m-%dT%H:%M:%SZ)/" "$task_file"
@@ -208,6 +232,15 @@ EOF
 
             # Append log entry
             echo "- $(date -u +%Y-%m-%dT%H:%M:%SZ) | status_change | ${new_status}" >> "$task_file"
+
+            # Update sprint metrics if task belongs to current sprint
+            if [ -f "$SWARM_DIR/current-sprint.json" ]; then
+                local in_sprint
+                in_sprint=$(jq --arg tid "$task_id" '.tasks | index($tid)' "$SWARM_DIR/current-sprint.json" 2>/dev/null)
+                if [ "$in_sprint" != "null" ] && [ -n "$in_sprint" ]; then
+                    update_sprint_metrics
+                fi
+            fi
 
             echo -e "${GREEN}[SWARM]${NC} Updated: ${task_id} -> ${new_status}"
             ;;
@@ -273,10 +306,18 @@ swarm_sprint() {
             local current_status
             current_status=$(jq -r '.status' "$SWARM_DIR/current-sprint.json")
             if [ "$current_status" = "active" ]; then
+                # Recalculate metrics before archiving
+                update_sprint_metrics
                 local current_name
                 current_name=$(jq -r '.name' "$SWARM_DIR/current-sprint.json")
-                cp "$SWARM_DIR/current-sprint.json" "$SWARM_DIR/sprints/${current_name// /-}.json"
-                echo -e "${YELLOW}[SWARM]${NC} Archived: $current_name"
+                local prev_counter
+                prev_counter=$(jq -r '.sprintCounter' "$SWARM_DIR/project.json")
+                local archive_name
+                archive_name=$(printf "sprint-%03d-%s" "$prev_counter" "${current_name// /-}")
+                jq '.status = "completed" | .endDate = (now | todate)' "$SWARM_DIR/current-sprint.json" > "$SWARM_DIR/current-sprint.json.tmp"
+                mv "$SWARM_DIR/current-sprint.json.tmp" "$SWARM_DIR/current-sprint.json"
+                cp "$SWARM_DIR/current-sprint.json" "$SWARM_DIR/sprints/${archive_name}.json"
+                echo -e "${YELLOW}[SWARM]${NC} Archived: $current_name -> sprints/${archive_name}.json"
             fi
 
             # Create new sprint
@@ -303,11 +344,20 @@ EOF
             local current_name
             current_name=$(jq -r '.name' "$SWARM_DIR/current-sprint.json")
 
+            # Recalculate final metrics before archiving
+            update_sprint_metrics
+
             jq '.status = "completed" | .endDate = (now | todate)' "$SWARM_DIR/current-sprint.json" > "$SWARM_DIR/current-sprint.json.tmp"
             mv "$SWARM_DIR/current-sprint.json.tmp" "$SWARM_DIR/current-sprint.json"
 
-            cp "$SWARM_DIR/current-sprint.json" "$SWARM_DIR/sprints/${current_name// /-}.json"
-            echo -e "${GREEN}[SWARM]${NC} Ended: $current_name"
+            # Archive to sprints/ with sprint counter
+            local sprint_counter
+            sprint_counter=$(jq -r '.sprintCounter' "$SWARM_DIR/project.json")
+            local archive_name
+            archive_name=$(printf "sprint-%03d-%s" "$sprint_counter" "${current_name// /-}")
+            cp "$SWARM_DIR/current-sprint.json" "$SWARM_DIR/sprints/${archive_name}.json"
+
+            echo -e "${GREEN}[SWARM]${NC} Ended & archived: $current_name -> sprints/${archive_name}.json"
             ;;
 
         status)
@@ -321,17 +371,92 @@ EOF
             echo -e "${CYAN}[SWARM]${NC} Sprint: $name ($status)"
             echo -e "  Goal: $goal"
 
-            # Count tasks by status
-            local planned=0 inprog=0 review=0 done=0
-            for f in "$SWARM_DIR"/tasks/*.task.md; do
-                [ -f "$f" ] || continue
-                if grep -q "Durum:\*\* planned" "$f"; then planned=$((planned + 1)); fi
-                if grep -q "Durum:\*\* in-progress" "$f"; then inprog=$((inprog + 1)); fi
-                if grep -q "Durum:\*\* review" "$f"; then review=$((review + 1)); fi
-                if grep -q "Durum:\*\* done" "$f"; then done=$((done + 1)); fi
-            done
+            # Count tasks by status - only tasks in current sprint
+            local planned=0 inprog=0 review=0 done_count=0
+            local sprint_tasks
+            sprint_tasks=$(jq -r '.tasks[]' "$SWARM_DIR/current-sprint.json" 2>/dev/null)
 
-            echo -e "  Tasks: ${YELLOW}$planned planned${NC} | ${CYAN}$inprog active${NC} | ${BLUE}$review review${NC} | ${GREEN}$done done${NC}"
+            if [ -n "$sprint_tasks" ]; then
+                for tid in $sprint_tasks; do
+                    local tfile="$SWARM_DIR/tasks/${tid}.task.md"
+                    [ -f "$tfile" ] || continue
+                    if grep -q "Durum:\*\* planned" "$tfile"; then planned=$((planned + 1)); fi
+                    if grep -q "Durum:\*\* in-progress" "$tfile"; then inprog=$((inprog + 1)); fi
+                    if grep -q "Durum:\*\* review" "$tfile"; then review=$((review + 1)); fi
+                    if grep -q "Durum:\*\* done" "$tfile"; then done_count=$((done_count + 1)); fi
+                done
+            fi
+
+            local total=$((planned + inprog + review + done_count))
+            echo -e "  Tasks ($total): ${YELLOW}$planned planned${NC} | ${CYAN}$inprog active${NC} | ${BLUE}$review review${NC} | ${GREEN}$done_count done${NC}"
+
+            # List task details
+            if [ -n "$sprint_tasks" ]; then
+                echo ""
+                for tid in $sprint_tasks; do
+                    local tfile="$SWARM_DIR/tasks/${tid}.task.md"
+                    [ -f "$tfile" ] || continue
+                    local tstatus
+                    tstatus=$(grep "Durum:\*\*" "$tfile" | sed 's/.*\*\* //')
+                    local tassignee
+                    tassignee=$(grep "Atanan:" "$tfile" | sed 's/.*\*\* //')
+                    local ttitle
+                    ttitle=$(head -1 "$tfile" | sed 's/^# //')
+                    local icon="⬜"
+                    case "$tstatus" in
+                        planned)     icon="⬜" ;;
+                        in-progress) icon="🔄" ;;
+                        review)      icon="👀" ;;
+                        done)        icon="✅" ;;
+                        blocked)     icon="🚫" ;;
+                    esac
+                    echo -e "  $icon $ttitle ($tassignee)"
+                done
+            fi
+            ;;
+
+        add-task)
+            local task_id="${1:-}"
+            if [ -z "$task_id" ]; then
+                echo -e "${RED}[SWARM]${NC} Usage: swarm sprint add-task TASK-XXX"
+                return 1
+            fi
+
+            local task_file="$SWARM_DIR/tasks/${task_id}.task.md"
+            if [ ! -f "$task_file" ]; then
+                echo -e "${RED}[SWARM]${NC} Task not found: $task_id"
+                return 1
+            fi
+
+            local sprint_status
+            sprint_status=$(jq -r '.status' "$SWARM_DIR/current-sprint.json")
+            if [ "$sprint_status" != "active" ]; then
+                echo -e "${RED}[SWARM]${NC} No active sprint. Start one first."
+                return 1
+            fi
+
+            # Check if already in sprint
+            local already
+            already=$(jq --arg tid "$task_id" '.tasks | index($tid)' "$SWARM_DIR/current-sprint.json")
+            if [ "$already" != "null" ]; then
+                echo -e "${YELLOW}[SWARM]${NC} $task_id is already in the current sprint."
+                return 0
+            fi
+
+            # Add to sprint
+            jq --arg tid "$task_id" '.tasks += [$tid]' "$SWARM_DIR/current-sprint.json" > "$SWARM_DIR/current-sprint.json.tmp"
+            mv "$SWARM_DIR/current-sprint.json.tmp" "$SWARM_DIR/current-sprint.json"
+
+            # Update sprint label in task file
+            local sprint_name
+            sprint_name=$(jq -r '.name' "$SWARM_DIR/current-sprint.json")
+            sed -i.bak "s/- \*\*Sprint:\*\* .*/- **Sprint:** ${sprint_name}/" "$task_file"
+            rm -f "${task_file}.bak"
+
+            # Recalculate metrics
+            update_sprint_metrics
+
+            echo -e "${GREEN}[SWARM]${NC} Added $task_id to current sprint"
             ;;
     esac
 }
@@ -498,6 +623,40 @@ ensure_swarm() {
     fi
 }
 
+# Recalculate sprint metrics from task files
+update_sprint_metrics() {
+    local sprint_file="$SWARM_DIR/current-sprint.json"
+    [ -f "$sprint_file" ] || return 0
+
+    local planned=0 inprog=0 completed=0 blocked=0
+
+    # Read task IDs from sprint
+    local task_ids
+    task_ids=$(jq -r '.tasks[]' "$sprint_file" 2>/dev/null)
+
+    for tid in $task_ids; do
+        local tfile="$SWARM_DIR/tasks/${tid}.task.md"
+        [ -f "$tfile" ] || continue
+        local status
+        status=$(grep "Durum:\*\*" "$tfile" | sed 's/.*\*\* //')
+        case "$status" in
+            planned)      planned=$((planned + 1)) ;;
+            in-progress)  inprog=$((inprog + 1)) ;;
+            review)       inprog=$((inprog + 1)) ;;
+            done)         completed=$((completed + 1)) ;;
+            blocked)      blocked=$((blocked + 1)) ;;
+        esac
+    done
+
+    jq --argjson p "$planned" --argjson i "$inprog" --argjson c "$completed" --argjson b "$blocked" '
+      .metrics.planned = $p |
+      .metrics.inProgress = $i |
+      .metrics.completed = $c |
+      .metrics.blocked = $b
+    ' "$sprint_file" > "${sprint_file}.tmp"
+    mv "${sprint_file}.tmp" "$sprint_file"
+}
+
 # ─────────────────────────────────────────────────────────────
 # ROUTER
 # ─────────────────────────────────────────────────────────────
@@ -519,6 +678,7 @@ case "$COMMAND" in
         echo "  swarm sprint start [name] [goal]"
         echo "  swarm sprint end"
         echo "  swarm sprint status"
+        echo "  swarm sprint add-task <TASK-XXX>"
         echo "  swarm handoff <from> <to> [task-id] [summary]"
         echo "  swarm communicate (pipe JSON)"
         echo "  swarm status"
