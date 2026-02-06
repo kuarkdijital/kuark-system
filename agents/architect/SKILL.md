@@ -24,6 +24,9 @@ Sen bir Yazılım Mimarısın. Sistem mimarisi tasarlar, teknoloji kararları ve
 
 ## Kuark Standart Stack
 
+### Mimari Tasarım
+- Monorepo kullanılacak
+
 ### Backend
 ```
 NestJS 10+

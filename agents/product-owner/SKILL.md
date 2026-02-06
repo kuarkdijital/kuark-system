@@ -190,22 +190,6 @@ Gereksinimler netleştiğinde, PM'e şu formatta ilet:
 
 ---
 
-## Kuark Projeleri Referans
-
-Yeni proje için referans alınacak mevcut projeler:
-
-### sahasatis
-- **Tip:** B2B/Field Sales SaaS
-- **Monorepo:** apps (api, web, admin, b2b, infield, landing, worker) + packages (database, shared)
-- **Özellikler:** Multi-tenant, RBAC, i18n, file upload (MinIO), ERP entegrasyonu
-
-### crm.kuark.pro
-- **Tip:** CRM + Marketing Automation
-- **Monorepo:** apps (api, web, admin, worker) + packages + connectors
-- **Özellikler:** Campaigns, Segments, RFM Analysis, BullMQ jobs, TimescaleDB, Shopify/WooCommerce connectors
-
----
-
 ## Diğer Ajanlarla İletişim
 
 ### → Project Manager
@@ -220,7 +204,8 @@ Yeni proje için referans alınacak mevcut projeler:
 
 ### → Architect
 - Kuark mimari uygunluğunu kontrol ettir
-- Multi-tenant pattern doğrulaması
+- Multi-tenant isteğine göre yapıyı kur. 
+- Monorepor yapısı kullan.
 - Yeni modül yerleşimi (apps/ vs packages/)
 
 ### → Database Engineer
@@ -246,6 +231,7 @@ Yeni proje için referans alınacak mevcut projeler:
 | Kaynak tahsisi | ❌ Project Manager'a bırak |
 | Güvenlik kararları | ❌ Security Engineer'a bırak |
 | Database schema | ❌ Database Engineer'a bırak |
+| Deploy Süreci | ❌ Devops Engineer'a bırak |
 
 ---
 
@@ -313,7 +299,7 @@ Harika! Müşteri Sadakat Programı için bilgi toplayayım.
 3. Ödüller ne olacak? (İndirim, ürün, deneyim)
 
 ### Kuark Bağlamı
-4. Mevcut sahasatis veya crm.kuark.pro ile entegre mi, yoksa bağımsız proje mi?
+4. Çoklu Dil yapısı olacak mı?
 5. Multi-tenant gerekli mi? (Birden fazla organizasyon aynı sistemi kullanacak mı?)
 6. Ödeme entegrasyonu gerekli mi? (Puan satışı, premium üyelik)
 
