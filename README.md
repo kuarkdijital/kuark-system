@@ -86,12 +86,46 @@ Claude Code ile calisirken arka planda surekli calisan hook'lar:
 # 1. kuark-system reposunu indir
 git clone <kuark-system-repo-url> ~/kuark-system
 
-# 2. Claude Code global config'e bagla
-# ~/.claude/CLAUDE.md dosyasina kuark-system icerigi zaten yüklü
-
-# 3. Hook'lari calistirilabilir yap
+# 2. Hook'lari calistirilabilir yap
 chmod +x ~/kuark-system/hooks/*.sh
+
+# 3. Claude Code global config'e bagla
+# ~/.claude/CLAUDE.md dosyasina kuark-system icerigi zaten yuklu
 ```
+
+### Hook Yapisi (Onemli!)
+
+Hook'lar `~/.claude/settings.json` dosyasinda tanimlanir. Bu dosya Claude Code'un **resmi** ayar dosyasidir.
+
+**Dikkat:** Hook'lar proje kokundeki `config.json`'da degil, `settings.json`'da olmalidir!
+
+Claude Code 3 katmanli settings okur:
+
+| Dosya | Kapsam | Git'e Eklenir? |
+|-------|--------|----------------|
+| `~/.claude/settings.json` | Global (tum projeler) | Hayir |
+| `.claude/settings.json` | Proje (takim) | Evet |
+| `.claude/settings.local.json` | Proje (kisisel) | Hayir |
+
+Hook'lar `$CLAUDE_PROJECT_DIR` degiskeni ile calisir. Bu degisken Claude Code tarafindan
+otomatik olarak mevcut proje dizinine isaret eder. Projedeki `hooks/` dizini yoksa
+`test -f` kontrolu sayesinde sessizce atlanir, hata vermez.
+
+### Otomatik Hook Listesi
+
+| Event | Hook | Ne Yapar |
+|-------|------|----------|
+| **SessionStart** | `init.sh` | Proje tipi, git durumu, swarm bilgisi gosterir |
+| **SessionStart** | `memory.sh` | Onceki oturum ogrenimlerini yukler |
+| **SessionStart** | `swarm.sh status` | Swarm durumunu gosterir |
+| **PreToolUse** (Edit/Write) | `validate.sh` | Hassas dosya kontrolu (.env, secrets) |
+| **PreToolUse** (Edit/Write) | `prisma-validate.sh` | Prisma schema kurallari |
+| **PreToolUse** (Edit/Write) | `nestjs-pattern-check.sh` | Guard, organizationId, DTO kontrolu |
+| **PreToolUse** (git commit) | `commit-check.sh` | TypeScript, test, secret taramasi |
+| **PreToolUse** (rm -rf) | prompt | Onay sorar |
+| **PreToolUse** (force push) | prompt | Onay sorar |
+| **PostToolUse** (Edit/Write) | `format.sh` | Prettier, TODO/FIXME, any kontrolu |
+| **Stop** | `memory.sh` | Oturum ogrenimlerini kaydeder |
 
 ### Dogrulama
 
