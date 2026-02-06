@@ -1,0 +1,17 @@
+# Swarm state (per-project, not versioned)
+.swarm/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+*.swp
+*.swo
+*~
+
+# Backup files
+*.bak
+
+# Version file (generated during install)
+version.txt

@@ -1,19 +1,23 @@
 #!/bin/bash
 # Kuark Session Initialization
-# Detects project context and loads relevant information
+# Runs as Claude Code SessionStart hook
+# Detects project context, initializes .swarm/, and injects agent context
 
 set -e
 
-# Colors
-GREEN='\033[0;32m'
-BLUE='\033[0;34m'
-YELLOW='\033[1;33m'
-CYAN='\033[0;36m'
-NC='\033[0m'
+# Source common helpers
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/_common.sh"
 
-echo -e "${CYAN}[KUARK]${NC} Initializing session..."
+# Persist KUARK_HOME for the session
+if [ -n "$CLAUDE_ENV_FILE" ]; then
+    echo "export KUARK_HOME=\"$KUARK_HOME\"" >> "$CLAUDE_ENV_FILE"
+fi
 
-# Detect project type
+# ─────────────────────────────────────────────────────────────
+# Project Detection
+# ─────────────────────────────────────────────────────────────
+
 detect_project() {
     if [ -f "nest-cli.json" ]; then
         echo "nestjs"
@@ -40,27 +44,22 @@ detect_project() {
     fi
 }
 
-# Detect Kuark-specific patterns
 detect_kuark_patterns() {
     local patterns=""
 
-    # Check for multi-tenant pattern
-    if grep -r "organizationId" --include="*.ts" src/ 2>/dev/null | head -1 > /dev/null; then
+    if grep -r "organizationId" --include="*.ts" src/ 2>/dev/null | head -1 > /dev/null 2>&1; then
         patterns="$patterns multi-tenant"
     fi
 
-    # Check for BullMQ
-    if grep -r "@nestjs/bullmq" --include="*.ts" src/ 2>/dev/null | head -1 > /dev/null; then
+    if grep -r "@nestjs/bullmq" --include="*.ts" src/ 2>/dev/null | head -1 > /dev/null 2>&1; then
         patterns="$patterns bullmq"
     fi
 
-    # Check for Prisma
     if [ -f "prisma/schema.prisma" ]; then
         patterns="$patterns prisma"
     fi
 
-    # Check for guards
-    if grep -r "JwtAuthGuard" --include="*.ts" src/ 2>/dev/null | head -1 > /dev/null; then
+    if grep -r "JwtAuthGuard" --include="*.ts" src/ 2>/dev/null | head -1 > /dev/null 2>&1; then
         patterns="$patterns jwt-auth"
     fi
 
@@ -68,13 +67,14 @@ detect_kuark_patterns() {
 }
 
 PROJECT_TYPE=$(detect_project)
-echo -e "${GREEN}Project Type:${NC} $PROJECT_TYPE"
+kuark_log "${CYAN}[KUARK]${NC} Initializing session..."
+kuark_log "${GREEN}Project Type:${NC} $PROJECT_TYPE"
 
-# Show Kuark patterns
+# Detect Kuark patterns
 if [ "$PROJECT_TYPE" = "nestjs" ] || [ "$PROJECT_TYPE" = "monorepo" ]; then
     PATTERNS=$(detect_kuark_patterns)
     if [ -n "$PATTERNS" ]; then
-        echo -e "${GREEN}Kuark Patterns:${NC}$PATTERNS"
+        kuark_log "${GREEN}Kuark Patterns:${NC}$PATTERNS"
     fi
 fi
 
@@ -83,32 +83,57 @@ if [ -d ".git" ]; then
     BRANCH=$(git branch --show-current 2>/dev/null || echo "detached")
     CHANGES=$(git status --porcelain 2>/dev/null | wc -l | tr -d ' ')
 
-    echo -e "${GREEN}Branch:${NC} $BRANCH"
+    kuark_log "${GREEN}Branch:${NC} $BRANCH"
 
     if [ "$CHANGES" -gt 0 ]; then
-        echo -e "${YELLOW}Changes:${NC} $CHANGES uncommitted"
+        kuark_log "${YELLOW}Changes:${NC} $CHANGES uncommitted"
     fi
 
-    # Recent commits
-    echo -e "${GREEN}Recent Commits:${NC}"
-    git log --oneline -3 2>/dev/null | sed 's/^/  /'
+    kuark_log "${GREEN}Recent Commits:${NC}"
+    git log --oneline -3 2>/dev/null | sed 's/^/  /' >&2
 fi
 
-# Swarm state management
+# ─────────────────────────────────────────────────────────────
+# Swarm State Management
+# ─────────────────────────────────────────────────────────────
+
+ACTIVE_AGENT=""
+
+if [ ! -d ".swarm" ]; then
+    kuark_log "${CYAN}[KUARK]${NC} No swarm found - auto-initializing..."
+    PROJ_NAME=$(basename "$(pwd)")
+    bash "$KUARK_HOME/hooks/swarm.sh" init "$PROJ_NAME" "$PROJECT_TYPE" 2>/dev/null || true
+
+    # Set product-owner as initial active agent
+    if [ -f ".swarm/context/active-agent.json" ]; then
+        TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+        cat > ".swarm/context/active-agent.json" << AGENTEOF
+{
+  "current": "product-owner",
+  "previous": null,
+  "handoffChain": [{"from": "system", "to": "product-owner", "at": "$TIMESTAMP"}],
+  "lastUpdated": "$TIMESTAMP"
+}
+AGENTEOF
+    fi
+    ACTIVE_AGENT="product-owner"
+    kuark_log "${GREEN}[KUARK]${NC} Swarm initialized. Active agent: product-owner"
+fi
+
 if [ -d ".swarm" ]; then
-    echo -e "${CYAN}[KUARK]${NC} Swarm state detected"
+    # Show project info
     if [ -f ".swarm/project.json" ]; then
-        PROJECT_NAME=$(cat .swarm/project.json | jq -r '.name // "Unknown"' 2>/dev/null || echo "Unknown")
-        PROJECT_STATUS=$(cat .swarm/project.json | jq -r '.status // "unknown"' 2>/dev/null || echo "unknown")
-        echo -e "${GREEN}Project:${NC} $PROJECT_NAME ($PROJECT_STATUS)"
+        SWARM_PROJECT_NAME=$(jq -r '.name // "Unknown"' .swarm/project.json 2>/dev/null || echo "Unknown")
+        SWARM_PROJECT_STATUS=$(jq -r '.status // "unknown"' .swarm/project.json 2>/dev/null || echo "unknown")
+        kuark_log "${GREEN}Project:${NC} $SWARM_PROJECT_NAME ($SWARM_PROJECT_STATUS)"
     fi
 
     # Sprint info
     if [ -f ".swarm/current-sprint.json" ]; then
-        SPRINT_NAME=$(cat .swarm/current-sprint.json | jq -r '.name // "None"' 2>/dev/null || echo "None")
-        SPRINT_STATUS=$(cat .swarm/current-sprint.json | jq -r '.status // "?"' 2>/dev/null || echo "?")
+        SPRINT_NAME=$(jq -r '.name // "None"' .swarm/current-sprint.json 2>/dev/null || echo "None")
+        SPRINT_STATUS=$(jq -r '.status // "?"' .swarm/current-sprint.json 2>/dev/null || echo "?")
         if [ "$SPRINT_NAME" != "null" ] && [ "$SPRINT_NAME" != "None" ]; then
-            echo -e "${GREEN}Sprint:${NC} $SPRINT_NAME ($SPRINT_STATUS)"
+            kuark_log "${GREEN}Sprint:${NC} $SPRINT_NAME ($SPRINT_STATUS)"
         fi
     fi
 
@@ -117,25 +142,107 @@ if [ -d ".swarm" ]; then
     if [ "$TASK_COUNT" -gt 0 ]; then
         DONE_COUNT=$(grep -l 'Durum:\*\* done' .swarm/tasks/*.task.md 2>/dev/null | wc -l | tr -d ' ')
         ACTIVE_COUNT=$(grep -l 'Durum:\*\* in-progress' .swarm/tasks/*.task.md 2>/dev/null | wc -l | tr -d ' ')
-        echo -e "${GREEN}Tasks:${NC} $TASK_COUNT total | $ACTIVE_COUNT active | $DONE_COUNT done"
+        kuark_log "${GREEN}Tasks:${NC} $TASK_COUNT total | $ACTIVE_COUNT active | $DONE_COUNT done"
     fi
 
-    # Active agent
-    if [ -f ".swarm/context/active-agent.json" ]; then
-        ACTIVE_AGENT=$(cat .swarm/context/active-agent.json | jq -r '.current // "none"' 2>/dev/null || echo "none")
-        if [ "$ACTIVE_AGENT" != "null" ] && [ "$ACTIVE_AGENT" != "none" ]; then
-            echo -e "${GREEN}Active Agent:${NC} $ACTIVE_AGENT"
+    # Determine active agent
+    if [ -z "$ACTIVE_AGENT" ] && [ -f ".swarm/context/active-agent.json" ]; then
+        ACTIVE_AGENT=$(jq -r '.current // "none"' .swarm/context/active-agent.json 2>/dev/null || echo "none")
+        if [ "$ACTIVE_AGENT" = "null" ] || [ "$ACTIVE_AGENT" = "none" ]; then
+            TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+            jq --arg ts "$TIMESTAMP" '.current = "product-owner" | .lastUpdated = $ts' \
+                .swarm/context/active-agent.json > .swarm/context/active-agent.json.tmp 2>/dev/null
+            mv .swarm/context/active-agent.json.tmp .swarm/context/active-agent.json
+            ACTIVE_AGENT="product-owner"
         fi
     fi
+
+    kuark_log "${GREEN}Active Agent:${NC} $ACTIVE_AGENT"
+fi
+
+# ─────────────────────────────────────────────────────────────
+# Build Agent Context for Claude Code
+# ─────────────────────────────────────────────────────────────
+
+AGENT_CONTEXT=""
+
+if [ -n "$ACTIVE_AGENT" ] && [ -f "$KUARK_HOME/agents/$ACTIVE_AGENT/SKILL.md" ]; then
+    AGENT_SKILL=$(cat "$KUARK_HOME/agents/$ACTIVE_AGENT/SKILL.md")
+    AGENT_CONTEXT="=== KUARK ACTIVE AGENT: $ACTIVE_AGENT ===
+Asagidaki talimatlari bu session boyunca ZORUNLU olarak uygula.
+Kullaniciya ilk yanitinda bu agent rolunde selamlama yap.
+
+$AGENT_SKILL
+
+=== END AGENT INSTRUCTIONS ==="
 else
-    echo -e "${YELLOW}[KUARK]${NC} No swarm state. Initialize with: bash hooks/swarm.sh init [project-name]"
+    AGENT_CONTEXT="=== KUARK: No active agent. Normal Claude mode. ==="
 fi
 
-# Load session memory if exists
+# Build swarm state context
+SWARM_CONTEXT=""
+if [ -d ".swarm" ]; then
+    SWARM_CONTEXT="
+=== KUARK SWARM STATE ===
+Project Type: $PROJECT_TYPE
+Active Agent: $ACTIVE_AGENT"
+
+    if [ -f ".swarm/project.json" ]; then
+        SWARM_CONTEXT="$SWARM_CONTEXT
+Project: $(jq -r '.name // "Unknown"' .swarm/project.json 2>/dev/null)"
+    fi
+
+    if [ -f ".swarm/current-sprint.json" ]; then
+        SPRINT_NAME=$(jq -r '.name // "None"' .swarm/current-sprint.json 2>/dev/null)
+        if [ "$SPRINT_NAME" != "null" ] && [ "$SPRINT_NAME" != "None" ]; then
+            SWARM_CONTEXT="$SWARM_CONTEXT
+Sprint: $SPRINT_NAME ($(jq -r '.status' .swarm/current-sprint.json 2>/dev/null))"
+        fi
+    fi
+
+    if [ "$TASK_COUNT" -gt 0 ] 2>/dev/null; then
+        SWARM_CONTEXT="$SWARM_CONTEXT
+Tasks: $TASK_COUNT total | $ACTIVE_COUNT active | $DONE_COUNT done"
+    fi
+
+    SWARM_CONTEXT="$SWARM_CONTEXT
+=== END SWARM STATE ==="
+fi
+
+# Load session memory
 MEMORY_DIR="$HOME/.claude/memory/kuark"
-MEMORY_FILE="$MEMORY_DIR/$(pwd | md5sum 2>/dev/null | cut -d' ' -f1 || echo "default").json"
+PROJECT_HASH=$(pwd | md5sum 2>/dev/null | cut -d' ' -f1 || md5 -q -s "$(pwd)" 2>/dev/null || echo "default")
+MEMORY_FILE="$MEMORY_DIR/$PROJECT_HASH.json"
+MEMORY_CONTEXT=""
 if [ -f "$MEMORY_FILE" ]; then
-    echo -e "${CYAN}[KUARK]${NC} Previous session learnings loaded"
+    LEARNINGS=$(jq -r '.learnings[]? | "- [\(.category)] \(.message)"' "$MEMORY_FILE" 2>/dev/null)
+    if [ -n "$LEARNINGS" ]; then
+        MEMORY_CONTEXT="
+=== KUARK SESSION MEMORY ===
+$LEARNINGS
+=== END SESSION MEMORY ==="
+        kuark_log "${CYAN}[KUARK]${NC} Previous session learnings loaded"
+    fi
 fi
 
-echo ""
+# ─────────────────────────────────────────────────────────────
+# Output JSON response for Claude Code SessionStart hook
+# ─────────────────────────────────────────────────────────────
+
+FULL_CONTEXT="$AGENT_CONTEXT
+
+$SWARM_CONTEXT
+
+$MEMORY_CONTEXT"
+
+# Escape for JSON
+ESCAPED_CONTEXT=$(echo "$FULL_CONTEXT" | jq -Rs '.')
+
+cat << EOF
+{
+  "hookSpecificOutput": {
+    "hookEventName": "SessionStart",
+    "additionalContext": $ESCAPED_CONTEXT
+  }
+}
+EOF

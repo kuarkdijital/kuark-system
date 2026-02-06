@@ -1,10 +1,15 @@
 #!/bin/bash
 # Kuark Post-edit Formatting
+# Runs as Claude Code PostToolUse hook for Edit|Write
 # Auto-formats files after edits and checks for anti-patterns
 
 set -e
 
-FILE_PATH="${CLAUDE_FILE_PATH:-}"
+# Source common helpers (parses stdin JSON from Claude Code)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/_common.sh"
+
+FILE_PATH="${HOOK_FILE_PATH:-${CLAUDE_FILE_PATH:-}}"
 
 if [ -z "$FILE_PATH" ]; then
     exit 0

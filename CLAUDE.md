@@ -1,7 +1,101 @@
 # Kuark Universal Development System - Core Directives
 
 > Kuark şirketine özel multi-agent development sistemi
-> Reference: ./CONVENTIONS.md for detailed standards
+> Installation: ~/.kuark/ | Hooks: ~/.claude/settings.json
+> Reference: ~/.kuark/CONVENTIONS.md for detailed standards
+
+---
+
+## Automatic Orchestration Protocol
+
+### Session Start Behavior
+
+When a Claude Code session starts in any project:
+1. The SessionStart hook auto-initializes `.swarm/` if missing
+2. `.swarm/context/active-agent.json` determines the current agent
+3. If no active agent exists, default to `product-owner`
+4. The agent's SKILL.md is loaded from `~/.kuark/agents/{agent}/SKILL.md`
+5. Greet the user in the active agent's role
+6. Follow the agent's protocol from its SKILL.md
+
+### "Proje Baslat" Automatic Flow
+
+When user says "proje baslat", "yeni proje", or similar, follow this automatic chain:
+
+**Phase 1: Product Owner**
+1. Activate `product-owner` role
+2. Ask the questions from `~/.kuark/agents/product-owner/SKILL.md`
+3. Gather requirements from user (vizyon, kapsam, teknik gereksinimler)
+4. Write user stories to `.swarm/backlog.json` in this format:
+   ```json
+   {
+     "items": [
+       {
+         "id": "US-001",
+         "title": "...",
+         "story": "Kullanici olarak... istiyorum ki... boylece...",
+         "priority": "must_have",
+         "effort": "M",
+         "acceptance_criteria": ["..."],
+         "technical_notes": "..."
+       }
+     ]
+   }
+   ```
+5. Update `.swarm/project.json` with project details
+6. Execute: `bash ~/.kuark/hooks/swarm.sh handoff product-owner project-manager`
+7. Announce: "Gereksinimler toplandi. Project Manager rolune geciyorum."
+
+**Phase 2: Project Manager**
+1. Activate `project-manager` role, read `~/.kuark/agents/project-manager/SKILL.md`
+2. Read `.swarm/backlog.json` for user stories
+3. Start sprint: `bash ~/.kuark/hooks/swarm.sh sprint start "Sprint 1" "Sprint hedefi"`
+4. Create tasks for each user story:
+   ```bash
+   bash ~/.kuark/hooks/swarm.sh task create "Task Title" "assigned-agent" "priority" "US-XXX"
+   ```
+5. Execute: `bash ~/.kuark/hooks/swarm.sh handoff project-manager architect`
+6. Announce: "Sprint planlandi, X task olusturuldu. Mimari tasarima geciyorum."
+
+**Phase 3: Architect**
+1. Activate `architect` role, read `~/.kuark/agents/architect/SKILL.md`
+2. Read tasks and backlog
+3. Make architectural decisions, write to `.swarm/context/decisions.json`
+4. Handoff to appropriate developer agent based on task types
+
+**Phase 4+: Development Agents**
+Follow the standard chain per task type:
+```
+database-engineer → nestjs-developer → nextjs-developer → qa-engineer → security-engineer → devops-engineer
+```
+
+### Agent Transition Rules
+
+When transitioning between agents, ALWAYS:
+1. Run `bash ~/.kuark/hooks/swarm.sh task update TASK-XXX review` (for outgoing task)
+2. Run `bash ~/.kuark/hooks/swarm.sh handoff {current-agent} {next-agent} TASK-XXX "summary"`
+3. Read the next agent's SKILL.md: `cat ~/.kuark/agents/{next-agent}/SKILL.md`
+4. Announce the role change to the user
+5. Continue with the next agent's responsibilities
+
+### State File Update Rules
+
+ALWAYS update .swarm files as work progresses:
+- Writing user stories → update `.swarm/backlog.json`
+- Creating tasks → `bash ~/.kuark/hooks/swarm.sh task create ...`
+- Starting work on a task → `bash ~/.kuark/hooks/swarm.sh task update TASK-XXX in-progress`
+- Completing a task → `bash ~/.kuark/hooks/swarm.sh task update TASK-XXX done`
+- Changing agents → `bash ~/.kuark/hooks/swarm.sh handoff ...`
+- Making architecture decisions → update `.swarm/context/decisions.json`
+
+### Manual Override Commands
+
+User can override automatic flow at any time:
+- "agent degistir: {agent-name}" → Switch to specific agent
+- "durumu goster" → Run `bash ~/.kuark/hooks/swarm.sh status`
+- "sprint durumu" → Run `bash ~/.kuark/hooks/swarm.sh sprint status`
+- "task listesi" → Run `bash ~/.kuark/hooks/swarm.sh task list`
+- "backlog goster" → Read `.swarm/backlog.json`
 
 ---
 
@@ -250,16 +344,16 @@ export function DataList() {
 
 | Module | Path | Use Case |
 |--------|------|----------|
-| `nestjs` | skills/nestjs/ | Backend API development |
-| `nextjs` | skills/nextjs/ | Frontend development |
-| `prisma` | skills/prisma/ | Database design |
-| `queue` | skills/queue/ | Background jobs |
-| `devops` | skills/devops/ | Infrastructure |
-| `security` | skills/security/ | Auth & security |
-| `api` | skills/api/ | API design |
-| `ui` | skills/ui/ | UI components |
-| `python` | skills/python/ | Python microservices |
-| `architect` | skills/architect/ | Architecture decisions |
+| `nestjs` | ~/.kuark/skills/nestjs/ | Backend API development |
+| `nextjs` | ~/.kuark/skills/nextjs/ | Frontend development |
+| `prisma` | ~/.kuark/skills/prisma/ | Database design |
+| `queue` | ~/.kuark/skills/queue/ | Background jobs |
+| `devops` | ~/.kuark/skills/devops/ | Infrastructure |
+| `security` | ~/.kuark/skills/security/ | Auth & security |
+| `api` | ~/.kuark/skills/api/ | API design |
+| `ui` | ~/.kuark/skills/ui/ | UI components |
+| `python` | ~/.kuark/skills/python/ | Python microservices |
+| `architect` | ~/.kuark/skills/architect/ | Architecture decisions |
 
 ---
 
@@ -267,21 +361,21 @@ export function DataList() {
 
 | Agent | Path | Role |
 |-------|------|------|
-| Orchestrator | agents/orchestrator/SKILL.md | Coordination |
-| Product Owner | agents/product-owner/ | Vision & backlog |
-| Project Manager | agents/project-manager/ | Sprints & tasks |
-| Analyst | agents/analyst/ | Requirements |
-| Architect | agents/architect/ | Architecture |
-| NestJS Developer | agents/nestjs-developer/ | Backend |
-| NextJS Developer | agents/nextjs-developer/ | Frontend |
-| Database Engineer | agents/database-engineer/ | Database |
-| Queue Developer | agents/queue-developer/ | Background jobs |
-| QA Engineer | agents/qa-engineer/ | Testing |
-| Security Engineer | agents/security-engineer/ | Security |
-| DevOps Engineer | agents/devops-engineer/ | Deployment |
-| API Researcher | agents/api-researcher/ | 3rd party APIs |
-| Documentation | agents/documentation/ | Docs |
-| Python Developer | agents/python-developer/ | Python services |
+| Orchestrator | ~/.kuark/agents/orchestrator/SKILL.md | Coordination |
+| Product Owner | ~/.kuark/agents/product-owner/ | Vision & backlog |
+| Project Manager | ~/.kuark/agents/project-manager/ | Sprints & tasks |
+| Analyst | ~/.kuark/agents/analyst/ | Requirements |
+| Architect | ~/.kuark/agents/architect/ | Architecture |
+| NestJS Developer | ~/.kuark/agents/nestjs-developer/ | Backend |
+| NextJS Developer | ~/.kuark/agents/nextjs-developer/ | Frontend |
+| Database Engineer | ~/.kuark/agents/database-engineer/ | Database |
+| Queue Developer | ~/.kuark/agents/queue-developer/ | Background jobs |
+| QA Engineer | ~/.kuark/agents/qa-engineer/ | Testing |
+| Security Engineer | ~/.kuark/agents/security-engineer/ | Security |
+| DevOps Engineer | ~/.kuark/agents/devops-engineer/ | Deployment |
+| API Researcher | ~/.kuark/agents/api-researcher/ | 3rd party APIs |
+| Documentation | ~/.kuark/agents/documentation/ | Docs |
+| Python Developer | ~/.kuark/agents/python-developer/ | Python services |
 
 ---
 
@@ -302,14 +396,14 @@ Kuark projeleri için öncelikli ödeme entegrasyonları:
 
 | Reference | Path | Content |
 |-----------|------|---------|
-| API Response Format | references/api-response-format.md | Standard API response structure |
-| Error Codes | references/error-codes.md | HTTP status codes, error handling |
-| Deployment Checklist | references/deployment-checklist.md | Railway + Docker deploy guide |
-| Monorepo Structure | references/monorepo-structure.md | pnpm + Turborepo setup |
-| Agent Handoff Protocol | references/agent-handoff-protocol.md | Agent-to-agent transition protocol |
-| Caching Strategy | references/caching-strategy.md | Redis cache patterns, invalidation |
-| Monitoring & Observability | references/monitoring-observability.md | Logging, metrics, health checks |
-| Rollback Strategy | references/rollback-strategy.md | Error recovery, git checkpoints |
+| API Response Format | ~/.kuark/references/api-response-format.md | Standard API response structure |
+| Error Codes | ~/.kuark/references/error-codes.md | HTTP status codes, error handling |
+| Deployment Checklist | ~/.kuark/references/deployment-checklist.md | Railway + Docker deploy guide |
+| Monorepo Structure | ~/.kuark/references/monorepo-structure.md | pnpm + Turborepo setup |
+| Agent Handoff Protocol | ~/.kuark/references/agent-handoff-protocol.md | Agent-to-agent transition protocol |
+| Caching Strategy | ~/.kuark/references/caching-strategy.md | Redis cache patterns, invalidation |
+| Monitoring & Observability | ~/.kuark/references/monitoring-observability.md | Logging, metrics, health checks |
+| Rollback Strategy | ~/.kuark/references/rollback-strategy.md | Error recovery, git checkpoints |
 
 ---
 
@@ -317,13 +411,13 @@ Kuark projeleri için öncelikli ödeme entegrasyonları:
 
 | Template | Path | Use Case |
 |----------|------|----------|
-| NestJS Module | templates/nestjs-module/ | Full CRUD module scaffold |
-| Next.js Page | templates/nextjs-page/ | App Router page + components |
-| Prisma Model | templates/prisma-model/ | Multi-tenant schema template |
-| BullMQ Processor | templates/bullmq-processor/ | Background job processor |
-| Docker | templates/docker/ | Dockerfile + compose |
-| Task | templates/task/ | Task, sprint, backlog templates |
-| Test | templates/test/ | Unit, controller, E2E test templates |
+| NestJS Module | ~/.kuark/templates/nestjs-module/ | Full CRUD module scaffold |
+| Next.js Page | ~/.kuark/templates/nextjs-page/ | App Router page + components |
+| Prisma Model | ~/.kuark/templates/prisma-model/ | Multi-tenant schema template |
+| BullMQ Processor | ~/.kuark/templates/bullmq-processor/ | Background job processor |
+| Docker | ~/.kuark/templates/docker/ | Dockerfile + compose |
+| Task | ~/.kuark/templates/task/ | Task, sprint, backlog templates |
+| Test | ~/.kuark/templates/test/ | Unit, controller, E2E test templates |
 
 ---
 
@@ -331,30 +425,30 @@ Kuark projeleri için öncelikli ödeme entegrasyonları:
 
 ### Initialize Swarm
 ```bash
-bash hooks/swarm.sh init "project-name"    # Create .swarm/
-bash hooks/swarm.sh status                  # Check status
+bash ~/.kuark/hooks/swarm.sh init "project-name"    # Create .swarm/
+bash ~/.kuark/hooks/swarm.sh status                  # Check status
 ```
 
 ### Task Management
 ```bash
-bash hooks/swarm.sh task create "Title" "agent" "priority" "US-XXX"
-bash hooks/swarm.sh task update TASK-001 in-progress
-bash hooks/swarm.sh task list
+bash ~/.kuark/hooks/swarm.sh task create "Title" "agent" "priority" "US-XXX"
+bash ~/.kuark/hooks/swarm.sh task update TASK-001 in-progress
+bash ~/.kuark/hooks/swarm.sh task list
 ```
 
 ### Sprint Management
 ```bash
-bash hooks/swarm.sh sprint start "Sprint 1" "Goal"
-bash hooks/swarm.sh sprint status
-bash hooks/swarm.sh sprint end
+bash ~/.kuark/hooks/swarm.sh sprint start "Sprint 1" "Goal"
+bash ~/.kuark/hooks/swarm.sh sprint status
+bash ~/.kuark/hooks/swarm.sh sprint end
 ```
 
 ### Agent Handoff
 ```bash
-bash hooks/swarm.sh handoff from-agent to-agent TASK-XXX "summary"
+bash ~/.kuark/hooks/swarm.sh handoff from-agent to-agent TASK-XXX "summary"
 ```
 
-> Full protocol: `references/agent-handoff-protocol.md`
+> Full protocol: `~/.kuark/references/agent-handoff-protocol.md`
 
 ---
 
@@ -363,7 +457,7 @@ bash hooks/swarm.sh handoff from-agent to-agent TASK-XXX "summary"
 Capture discoveries during work:
 
 ```bash
-echo '{"category":"discovery","content":"Description"}' | bash ./hooks/memory.sh
+echo '{"category":"discovery","content":"Description"}' | bash ~/.kuark/hooks/memory.sh
 ```
 
 Categories: `discovery`, `pattern`, `note`, `warning`

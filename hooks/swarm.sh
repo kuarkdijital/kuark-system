@@ -4,6 +4,9 @@
 
 set -e
 
+# Global kuark-system installation path
+KUARK_HOME="${KUARK_HOME:-$HOME/.kuark}"
+
 CYAN='\033[0;36m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -216,7 +219,7 @@ EOF
             for status in "planned" "in-progress" "review" "done"; do
                 local count=0
                 local tasks=""
-                for f in "$SWARM_DIR"/tasks/*.task.md 2>/dev/null; do
+                for f in "$SWARM_DIR"/tasks/*.task.md; do
                     [ -f "$f" ] || continue
                     if grep -q "Durum:\*\* $status" "$f"; then
                         local id
@@ -320,7 +323,7 @@ EOF
 
             # Count tasks by status
             local planned=0 inprog=0 review=0 done=0
-            for f in "$SWARM_DIR"/tasks/*.task.md 2>/dev/null; do
+            for f in "$SWARM_DIR"/tasks/*.task.md; do
                 [ -f "$f" ] || continue
                 if grep -q "Durum:\*\* planned" "$f"; then planned=$((planned + 1)); fi
                 if grep -q "Durum:\*\* in-progress" "$f"; then inprog=$((inprog + 1)); fi
@@ -448,7 +451,7 @@ swarm_status() {
 
     # Task counts
     local total=0 planned=0 inprog=0 review=0 done=0
-    for f in "$SWARM_DIR"/tasks/*.task.md 2>/dev/null; do
+    for f in "$SWARM_DIR"/tasks/*.task.md; do
         [ -f "$f" ] || continue
         total=$((total + 1))
         if grep -q "Durum:\*\* planned" "$f"; then planned=$((planned + 1)); fi

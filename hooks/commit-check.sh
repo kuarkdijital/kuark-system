@@ -4,6 +4,9 @@
 
 set -e
 
+# Global kuark-system installation path
+KUARK_HOME="${KUARK_HOME:-$HOME/.kuark}"
+
 echo "[KUARK] Running pre-commit checks..."
 
 # TypeScript check

@@ -4,7 +4,11 @@
 
 set -e
 
-FILE_PATH="${CLAUDE_FILE_PATH:-}"
+# Source common helpers (parses stdin JSON from Claude Code)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/_common.sh"
+
+FILE_PATH="${HOOK_FILE_PATH:-${CLAUDE_FILE_PATH:-}}"
 
 # Only run for TypeScript files in modules directory
 if [[ ! "$FILE_PATH" =~ modules/.*\.ts$ ]]; then

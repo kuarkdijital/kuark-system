@@ -1,11 +1,15 @@
 #!/bin/bash
 # Kuark Pre-edit Validation
+# Runs as Claude Code PreToolUse hook for Edit|Write
 # Checks for potentially dangerous patterns before file edits
 
 set -e
 
-# Get file path from environment (set by Claude Code)
-FILE_PATH="${CLAUDE_FILE_PATH:-}"
+# Source common helpers (parses stdin JSON from Claude Code)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/_common.sh"
+
+FILE_PATH="${HOOK_FILE_PATH:-${CLAUDE_FILE_PATH:-}}"
 
 if [ -z "$FILE_PATH" ]; then
     exit 0
