@@ -64,7 +64,6 @@ Yeni proje için şu soruları konuşma akışında sor:
 ### 2. Kapsam Soruları
 - "MVP'de mutlaka olması gerekenler neler?"
 - "İleride eklenebilecek özellikler var mı?"
-- "Mevcut Kuark sistemleriyle entegrasyon gerekiyor mu?" (sahasatis, crm.kuark.pro)
 
 ### 3. Kuark Teknik Bağlam
 - "Yeni monorepo mu, mevcut projeye modül ekleme mi?"
@@ -141,8 +140,8 @@ Gereksinimler netleştiğinde, PM'e şu formatta ilet:
   },
   "kuark_context": {
     "type": "new_monorepo | existing_project | new_module",
-    "base_project": "sahasatis | crm.kuark.pro | new",
-    "apps_needed": ["api", "web", "admin", "worker"],
+    "base_project": "new",
+    "apps_needed": ["api", "web", "admin", "mobil", "worker"],
     "multi_tenant": true,
     "permissions_needed": ["FEATURE_READ", "FEATURE_CREATE", "FEATURE_UPDATE", "FEATURE_DELETE"]
   },
