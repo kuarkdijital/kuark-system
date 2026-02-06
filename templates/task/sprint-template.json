@@ -1,0 +1,33 @@
+{
+  "name": "Sprint N",
+  "status": "active",
+  "goal": "Sprint hedefi - tek cumlelik aciklama",
+  "startDate": "YYYY-MM-DDTHH:MM:SSZ",
+  "endDate": null,
+  "duration": "2 weeks",
+  "tasks": [
+    {
+      "id": "TASK-001",
+      "title": "Task basligi",
+      "assignee": "nestjs-developer",
+      "status": "planned",
+      "storyPoints": 5,
+      "userStory": "US-001"
+    }
+  ],
+  "metrics": {
+    "planned": 0,
+    "completed": 0,
+    "inProgress": 0,
+    "blocked": 0,
+    "totalStoryPoints": 0,
+    "completedStoryPoints": 0,
+    "velocity": null
+  },
+  "risks": [],
+  "retrospective": {
+    "whatWentWell": [],
+    "whatToImprove": [],
+    "actionItems": []
+  }
+}

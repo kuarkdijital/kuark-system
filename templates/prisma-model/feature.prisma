@@ -1,0 +1,49 @@
+// Kuark Prisma Model Template
+// Add this to your schema.prisma file
+
+model Feature {
+  id             String    @id @default(cuid())
+  organizationId String    @map("organization_id")
+
+  // Core fields
+  name           String
+  description    String?
+  status         FeatureStatus @default(DRAFT)
+
+  // Audit fields (ZORUNLU)
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  deletedAt      DateTime? @map("deleted_at")
+  createdBy      String?   @map("created_by")
+  updatedBy      String?   @map("updated_by")
+  deletedBy      String?   @map("deleted_by")
+
+  // Relations
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  // Indexes (ZORUNLU: organizationId her zaman index'te)
+  @@index([organizationId])
+  @@index([organizationId, status])
+  @@index([organizationId, createdAt])
+  @@index([organizationId, deletedAt])
+
+  @@map("features")
+}
+
+enum FeatureStatus {
+  DRAFT
+  ACTIVE
+  INACTIVE
+}
+
+// ============================================
+// MODEL CHECKLIST
+// ============================================
+// [✓] organizationId field var
+// [✓] deletedAt field var (soft delete)
+// [✓] createdAt, updatedAt var
+// [✓] createdBy, updatedBy, deletedBy var
+// [✓] organizationId üzerinde index var
+// [✓] organization relation tanımlı
+// [✓] snake_case mapping kullanıldı
+// ============================================

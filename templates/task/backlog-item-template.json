@@ -1,0 +1,26 @@
+{
+  "id": "US-XXX",
+  "title": "User Story basligi",
+  "description": "Kullanici olarak, [rol] istiyorum ki, [ozellik] boylece [fayda]",
+  "priority": "must_have | should_have | could_have | wont_have",
+  "businessValue": "high | medium | low",
+  "effort": "XS | S | M | L | XL",
+  "storyPoints": 0,
+  "status": "backlog | ready | in_sprint | done",
+  "sprint": null,
+  "assignee": null,
+  "module": "feature-name",
+  "acceptanceCriteria": [
+    "Given [precondition] When [action] Then [expected result]"
+  ],
+  "kuarkContext": {
+    "multiTenant": true,
+    "permissions": ["FEATURE_READ", "FEATURE_CREATE"],
+    "queues": [],
+    "integrations": []
+  },
+  "dependencies": [],
+  "tasks": [],
+  "created": "YYYY-MM-DDTHH:MM:SSZ",
+  "updated": "YYYY-MM-DDTHH:MM:SSZ"
+}

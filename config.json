@@ -1,0 +1,118 @@
+{
+  "permissions": {
+    "defaultMode": "dontAsk"
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_ROOT/hooks/init.sh\"",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "KUARK_EVENT=SessionStart bash \"$CLAUDE_PROJECT_ROOT/hooks/memory.sh\"",
+            "timeout": 2
+          },
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_ROOT/hooks/swarm.sh\" status 2>/dev/null || true",
+            "timeout": 3
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "KUARK_EVENT=Stop bash \"$CLAUDE_PROJECT_ROOT/hooks/memory.sh\"",
+            "timeout": 2
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_ROOT/hooks/validate.sh\"",
+            "timeout": 2
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_ROOT/hooks/prisma-validate.sh\"",
+            "timeout": 3
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_ROOT/hooks/nestjs-pattern-check.sh\"",
+            "timeout": 3
+          }
+        ]
+      },
+      {
+        "matcher": "Bash(rm -rf*)",
+        "hooks": [
+          {
+            "type": "prompt",
+            "prompt": "Destructive operation detected. Please confirm the target path."
+          }
+        ]
+      },
+      {
+        "matcher": "Bash(git push*-f*)|Bash(git push*--force*)",
+        "hooks": [
+          {
+            "type": "prompt",
+            "prompt": "Force push detected. This will rewrite remote history. Continue?"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash(git commit*)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_ROOT/hooks/commit-check.sh\"",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_ROOT/hooks/format.sh\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "bash \"$CLAUDE_PROJECT_ROOT/hooks/statusline.sh\""
+  },
+  "promptSuggestionEnabled": false
+}
