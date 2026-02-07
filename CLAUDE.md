@@ -61,12 +61,22 @@ When user says "proje baslat", "yeni proje", or similar, follow this automatic c
 1. Activate `architect` role, read `~/.kuark/agents/architect/SKILL.md`
 2. Read tasks and backlog
 3. Make architectural decisions, write to `.swarm/context/decisions.json`
-4. Handoff to appropriate developer agent based on task types
+4. Handoff to `ui-ux-designer` for UI/UX tasks, or directly to developer agents for backend-only tasks
 
-**Phase 4+: Development Agents**
+**Phase 4: UI/UX Designer**
+1. Activate `ui-ux-designer` role, read `~/.kuark/agents/ui-ux-designer/SKILL.md`
+2. Read architectural decisions and user stories
+3. Create wireframes/mockups using Pencil MCP (.pen files)
+4. Define design system (colors, typography, spacing tokens)
+5. Write component specs for each screen
+6. Design all states: loading, error, empty, success
+7. Execute: `bash ~/.kuark/hooks/swarm.sh handoff ui-ux-designer nextjs-developer TASK-XXX "Design tamamlandi"`
+8. Announce: "Tasarimlar tamamlandi. Frontend gelistirmeye geciyorum."
+
+**Phase 5+: Development Agents**
 Follow the standard chain per task type:
 ```
-database-engineer → nestjs-developer → nextjs-developer → qa-engineer → security-engineer → devops-engineer
+database-engineer → nestjs-developer → ui-ux-designer → nextjs-developer → qa-engineer → security-engineer → devops-engineer
 ```
 
 ### Agent Transition Rules
@@ -134,9 +144,11 @@ Activate specialized agents based on context:
 | BullMQ, processor, background job | `queue-developer` |
 | Test, coverage, QA, E2E | `qa-engineer` |
 | Güvenlik, audit, RBAC | `security-engineer` |
+| Wireframe, mockup, tasarım, UX akışı, design system | `ui-ux-designer` |
 | Deploy, Docker, Railway | `devops-engineer` |
 | 3rd party API, entegrasyon, iyzico, banka | `api-researcher` |
 | Dokümantasyon, README, API docs | `documentation` |
+| Wireframe, mockup, tasarım, UX, design system, Pencil | `ui-ux-designer` |
 | Python, FastAPI, microservice | `python-developer` |
 
 ---
@@ -376,6 +388,7 @@ export function DataList() {
 | API Researcher | ~/.kuark/agents/api-researcher/ | 3rd party APIs |
 | Documentation | ~/.kuark/agents/documentation/ | Docs |
 | Python Developer | ~/.kuark/agents/python-developer/ | Python services |
+| UI/UX Designer | ~/.kuark/agents/ui-ux-designer/ | UI/UX design & wireframe |
 
 ---
 

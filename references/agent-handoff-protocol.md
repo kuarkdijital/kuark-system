@@ -89,6 +89,56 @@ Yeni agent baslamadan once:
 }
 ```
 
+### Architect -> UI/UX Designer
+
+```json
+{
+  "handoff_type": "architecture_to_design",
+  "from": "architect",
+  "to": "ui-ux-designer",
+  "deliverables": {
+    "decisions": ".swarm/context/decisions.json",
+    "screens_needed": ["Dashboard", "Feature List", "Feature Form", "Settings"],
+    "data_models": ["Feature", "User", "Organization"],
+    "user_stories": ["US-001", "US-002"]
+  },
+  "context": {
+    "apps": ["web", "admin"],
+    "multi_tenant": true,
+    "permissions": ["FEATURE_READ", "FEATURE_CREATE"]
+  },
+  "next_action": "Wireframe ve design system olusturma"
+}
+```
+
+### UI/UX Designer -> NextJS Developer
+
+```json
+{
+  "handoff_type": "design_to_frontend",
+  "from": "ui-ux-designer",
+  "to": "nextjs-developer",
+  "deliverables": {
+    "design_files": ["designs/feature.pen"],
+    "design_system": {
+      "colors": "Renk token tanimlari",
+      "typography": "Font ayarlari",
+      "spacing": "Spacing scale"
+    },
+    "screens": [
+      {
+        "name": "Dashboard",
+        "components": ["Sidebar", "KPICard", "DataTable"],
+        "states": ["loading", "error", "empty", "success"],
+        "responsive": ["mobile", "tablet", "desktop"]
+      }
+    ],
+    "component_specs": ".swarm/handoffs/outputs/TASK-XXX-design.md"
+  },
+  "next_action": "Frontend component implementasyonu"
+}
+```
+
 ### Developer -> QA Engineer
 
 ```json
@@ -184,19 +234,28 @@ Yeni agent baslamadan once:
 product-owner ──→ project-manager ──→ architect ──→ database-engineer
                                                          │
                                                          ▼
-devops-engineer ←── security-engineer ←── qa-engineer ←── nestjs-developer
-      │                                                        │
-      ▼                                                        ▼
-project-manager ←────────────────────────────────── nextjs-developer
+                                                    nestjs-developer
+                                                         │
+                                                         ▼
+                                                    ui-ux-designer
+                                                         │
+                                                         ▼
+devops-engineer ←── security-engineer ←── qa-engineer ←── nextjs-developer
       │
       ▼
-product-owner (demo/report)
+project-manager ←── product-owner (demo/report)
 ```
 
 ### Bug Fix Zinciri
 
 ```
 project-manager ──→ developer ──→ qa-engineer ──→ project-manager
+```
+
+### UI Odakli Ozellik Zinciri
+
+```
+architect ──→ ui-ux-designer ──→ nextjs-developer ──→ qa-engineer
 ```
 
 ### Database Degisikligi Zinciri
