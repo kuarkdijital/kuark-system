@@ -14,6 +14,12 @@ Veya manuel:
 git clone https://github.com/kuarkdijital/kuark-system.git ~/.kuark
 bash ~/.kuark/install.sh
 ```
+Manuel Update:
+```bash
+cd ~/.kuark && git pull origin main
+bash ~/.kuark/install.sh
+```
+
 
 ## Ne Yapar?
 
