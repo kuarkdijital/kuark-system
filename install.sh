@@ -117,37 +117,42 @@ if [ ! -f "$KUARK_CLAUDE_MD" ]; then
     exit 1
 fi
 
-# Build the kuark section with markers
-KUARK_SECTION="$MARKER_START
-# Kuark Universal Development System (Auto-injected)
-# Source: ~/.kuark/CLAUDE.md | Do not edit between markers
-# Update: bash ~/.kuark/update.sh | Remove: bash ~/.kuark/uninstall.sh
-
-$(cat "$KUARK_CLAUDE_MD")
-$MARKER_END"
+# Build the kuark section in a temp file
+SECTION_TMP=$(mktemp)
+{
+    echo "$MARKER_START"
+    echo "# Kuark Universal Development System (Auto-injected)"
+    echo "# Source: ~/.kuark/CLAUDE.md | Do not edit between markers"
+    echo "# Update: bash ~/.kuark/update.sh | Remove: bash ~/.kuark/uninstall.sh"
+    echo ""
+    cat "$KUARK_CLAUDE_MD"
+    echo "$MARKER_END"
+} > "$SECTION_TMP"
 
 if [ -f "$CLAUDE_MD" ]; then
     if grep -q "$MARKER_START" "$CLAUDE_MD" 2>/dev/null; then
-        # Replace existing kuark section
-        # Use awk to replace content between markers
-        awk -v start="$MARKER_START" -v replacement="$KUARK_SECTION" '
-            $0 ~ start { printing=0; print replacement; next }
-            /<!-- KUARK-SYSTEM-END -->/ { printing=1; next }
-            printing!=0 { print }
-            BEGIN { printing=1 }
-        ' "$CLAUDE_MD" > "$CLAUDE_MD.tmp"
-        mv "$CLAUDE_MD.tmp" "$CLAUDE_MD"
+        # Replace existing kuark section using python3 (handles multi-line safely)
+        python3 -c "
+import sys
+ms, me = sys.argv[1], sys.argv[2]
+content = open(sys.argv[3]).read()
+section = open(sys.argv[4]).read()
+i = content.index(ms)
+j = content.index(me) + len(me)
+open(sys.argv[3], 'w').write(content[:i] + section + content[j:])
+" "$MARKER_START" "$MARKER_END" "$CLAUDE_MD" "$SECTION_TMP"
         echo -e "${GREEN}[OK]${NC} CLAUDE.md updated (existing kuark section replaced)"
     else
         # Append to existing file
         echo "" >> "$CLAUDE_MD"
-        echo "$KUARK_SECTION" >> "$CLAUDE_MD"
+        cat "$SECTION_TMP" >> "$CLAUDE_MD"
         echo -e "${GREEN}[OK]${NC} CLAUDE.md updated (kuark section appended)"
     fi
 else
-    echo "$KUARK_SECTION" > "$CLAUDE_MD"
+    cp "$SECTION_TMP" "$CLAUDE_MD"
     echo -e "${GREEN}[OK]${NC} CLAUDE.md created"
 fi
+rm -f "$SECTION_TMP"
 
 # ─────────────────────────────────────────────────────────────
 # Step 5: Merge hooks into ~/.claude/settings.json
