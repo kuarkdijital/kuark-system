@@ -125,6 +125,7 @@ Route requests to the appropriate skill module:
 | UI, Tailwind, Radix, shadcn, component, state, styling | `ui` |
 | FastAPI, microservice, Python, Pydantic, async | `python` |
 | architecture, design, ADR, technology, decision, pattern | `architect` |
+| Pencil, .pen, wireframe, mockup, design system, ekran tasarimi | `pencil` |
 
 ---
 
@@ -366,6 +367,7 @@ export function DataList() {
 | `ui` | ~/.kuark/skills/ui/ | UI components |
 | `python` | ~/.kuark/skills/python/ | Python microservices |
 | `architect` | ~/.kuark/skills/architect/ | Architecture decisions |
+| `pencil` | ~/.kuark/skills/pencil/ | Pencil MCP ile UI tasarimi |
 
 ---
 

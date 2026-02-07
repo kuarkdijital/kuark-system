@@ -176,30 +176,56 @@ Her tasarim adimindan sonra `get_screenshot()` ile kontrol et:
 
 ## Pencil MCP Kullanim Rehberi
 
-### Yeni Tasarim Baslat
+> **DETAYLI REHBER:** `~/.kuark/skills/pencil/MODULE.md`
+> Ekran sablonlari, batch_design ornekleri, design system kurulumu, state tasarimlari
+> ve gorsel dogrulama protokolu icin bu dosyayi oku.
+
+### ZORUNLU Baslangic Adımlari
+
+Her tasarim oturumunda MUTLAKA su siralamayi izle:
+
 ```
 1. get_editor_state(include_schema=true)   # Schema'yi ogren
-2. open_document("new")                     # Yeni dosya ac VEYA
-   open_document("designs/feature.pen")     # Mevcut dosya ac
-3. get_guidelines("design-system")          # Tasarim kurallari
-4. get_style_guide_tags()                   # Mevcut tag'leri gor
-5. get_style_guide(tags=[...])              # Ilham al
+2. open_document("designs/{proje}.pen")    # Dosya ac/olustur
+3. get_guidelines("design-system")         # Tasarim kurallarini oku
+4. get_style_guide_tags()                  # Mevcut tag'leri gor
+5. get_style_guide(tags=[...])             # Stil ilhami al
+6. set_variables(...)                      # Design system token'lari kur
 ```
 
-### Ekran Tasarimi
+### Ekran Tasarimi Dongusu
+
+Her ekran icin:
 ```
 1. find_empty_space_on_canvas(...)          # Bos alan bul
-2. batch_design(operations)                 # Ekran olustur
-3. get_screenshot(nodeId)                   # Sonucu dogrula
-4. snapshot_layout(parentId)                # Layout kontrol
+2. batch_design(operations)                 # Ekran olustur (max 25 op/cagri)
+3. get_screenshot(nodeId)                   # GORSEL DOGRULAMA
+4. snapshot_layout(parentId, problemsOnly=true) # Teknik kontrol
+5. Sorun varsa → batch_design() ile duzelt
+6. Tekrar get_screenshot() → Onay
 ```
 
-### Design System Component'leri
+### Design System Kurulumu
 ```
 1. batch_get(patterns=[{reusable: true}])   # Mevcut component'leri gor
-2. batch_design(...)                        # Yeni component tanimla
-3. get_variables()                          # Variable'lari oku
-4. set_variables(...)                       # Renk/spacing token'lari ayarla
+2. batch_design(...)                        # Reusable component tanimla
+3. get_variables() / set_variables(...)     # Renk/spacing token'lari
+```
+
+### State Tasarimlari (4 ZORUNLU STATE)
+Her ekranin su state'leri ayri frame olarak tasarlanmali:
+- **Loading**: Skeleton placeholder'lar (#e2e8f0 fill)
+- **Error**: Kirmizi alert + retry button
+- **Empty**: Ilustrasyon + CTA button
+- **Success**: Normal veri goruntuleme (primary state)
+
+> Detayli operation ornekleri: `~/.kuark/skills/pencil/MODULE.md` → "State Tasarimlari" bolumu
+
+### Gorsel Dogrulama Protokolu (HER ADIMDA)
+```
+1. get_screenshot(nodeId)                   # Her islemden sonra gorsel kontrol
+2. snapshot_layout(parentId, problemsOnly=true) # Tasma/ust uste binme kontrol
+3. search_all_unique_properties(...)        # Tutarlilik kontrol (font, renk)
 ```
 
 ---
