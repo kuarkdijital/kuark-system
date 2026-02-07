@@ -1,0 +1,134 @@
+#!/bin/bash
+# Kuark System Setup - Links Homebrew installation to Claude Code
+# Run after: brew install kuark-system
+set -e
+
+# Detect prefix: Homebrew symlink or direct install
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+if [ -L "$SCRIPT_DIR/kuark-setup" ]; then
+    KUARK_PREFIX="$(cd "$(dirname "$(readlink "$SCRIPT_DIR/kuark-setup")")" && cd .. && pwd)"
+else
+    KUARK_PREFIX="$(cd "$SCRIPT_DIR/.." && pwd)"
+fi
+
+KUARK_HOME="$HOME/.kuark"
+CLAUDE_HOME="$HOME/.claude"
+
+GREEN='\033[0;32m'
+CYAN='\033[0;36m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+printf "${CYAN}[KUARK]${NC} Setting up Kuark System...\n"
+
+# 1. Symlink ~/.kuark -> Homebrew prefix
+if [ -L "$KUARK_HOME" ]; then
+    rm "$KUARK_HOME"
+elif [ -d "$KUARK_HOME" ]; then
+    BACKUP="$KUARK_HOME.backup.$(date +%s)"
+    mv "$KUARK_HOME" "$BACKUP"
+    printf "${YELLOW}[WARN]${NC} Existing ~/.kuark backed up to $BACKUP\n"
+fi
+ln -sfn "$KUARK_PREFIX" "$KUARK_HOME"
+printf "${GREEN}[OK]${NC} ~/.kuark -> $KUARK_PREFIX\n"
+
+# 2. Ensure Claude directories
+mkdir -p "$CLAUDE_HOME"
+mkdir -p "$CLAUDE_HOME/memory/kuark"
+
+# 3. Inject CLAUDE.md
+MARKER_START="<!-- KUARK-SYSTEM-START -->"
+MARKER_END="<!-- KUARK-SYSTEM-END -->"
+CLAUDE_MD="$CLAUDE_HOME/CLAUDE.md"
+KUARK_CLAUDE_MD="$KUARK_PREFIX/CLAUDE.md"
+
+# Build the kuark section in a temp file
+SECTION_TMP=$(mktemp)
+{
+    echo "$MARKER_START"
+    echo "# Kuark Universal Development System (Auto-injected via Homebrew)"
+    echo "# Source: ~/.kuark/CLAUDE.md | Do not edit between markers"
+    echo "# Update: brew upgrade kuark-system && kuark-setup | Remove: brew uninstall kuark-system"
+    echo ""
+    cat "$KUARK_CLAUDE_MD"
+    echo "$MARKER_END"
+} > "$SECTION_TMP"
+
+if [ -f "$KUARK_CLAUDE_MD" ]; then
+    if [ -f "$CLAUDE_MD" ]; then
+        if grep -q "$MARKER_START" "$CLAUDE_MD" 2>/dev/null; then
+            python3 -c "
+import sys
+ms, me = sys.argv[1], sys.argv[2]
+content = open(sys.argv[3]).read()
+section = open(sys.argv[4]).read()
+i = content.index(ms)
+j = content.index(me) + len(me)
+open(sys.argv[3], 'w').write(content[:i] + section + content[j:])
+" "$MARKER_START" "$MARKER_END" "$CLAUDE_MD" "$SECTION_TMP"
+            printf "${GREEN}[OK]${NC} CLAUDE.md updated (existing section replaced)\n"
+        else
+            echo "" >> "$CLAUDE_MD"
+            cat "$SECTION_TMP" >> "$CLAUDE_MD"
+            printf "${GREEN}[OK]${NC} CLAUDE.md updated (section appended)\n"
+        fi
+    else
+        cp "$SECTION_TMP" "$CLAUDE_MD"
+        printf "${GREEN}[OK]${NC} CLAUDE.md created\n"
+    fi
+fi
+rm -f "$SECTION_TMP"
+
+# 4. Merge hooks into settings.json
+HOOKS_SOURCE="$KUARK_PREFIX/.claude-hooks.json"
+SETTINGS_FILE="$CLAUDE_HOME/settings.json"
+
+if [ -f "$HOOKS_SOURCE" ]; then
+    if [ -f "$SETTINGS_FILE" ]; then
+        if grep -q "kuark" "$SETTINGS_FILE" 2>/dev/null; then
+            CLEANED=$(jq '
+                if .hooks then
+                    .hooks |= with_entries(
+                        .value |= map(
+                            .hooks |= map(select(.command | test("kuark") | not))
+                        ) | map(select(.hooks | length > 0))
+                    )
+                else . end
+            ' "$SETTINGS_FILE" 2>/dev/null || cat "$SETTINGS_FILE")
+            echo "$CLEANED" > "$SETTINGS_FILE.tmp"
+            mv "$SETTINGS_FILE.tmp" "$SETTINGS_FILE"
+        fi
+
+        jq -s '
+            (.[0] // {}) as $e | (.[1] // {}) as $k |
+            $e * { hooks: (($e.hooks // {}) as $eh | ($k.hooks // {}) as $kh |
+            (($eh | keys) + ($kh | keys)) | unique | map(. as $key |
+            (($eh[$key] // []) + ($kh[$key] // [])) | {($key): .}) | add // {}) }
+        ' "$SETTINGS_FILE" "$HOOKS_SOURCE" > "$SETTINGS_FILE.tmp" 2>/dev/null
+
+        if [ -s "$SETTINGS_FILE.tmp" ]; then
+            mv "$SETTINGS_FILE.tmp" "$SETTINGS_FILE"
+            printf "${GREEN}[OK]${NC} Hooks merged into settings.json\n"
+        else
+            rm -f "$SETTINGS_FILE.tmp"
+            jq --argjson hooks "$(jq '.hooks' "$HOOKS_SOURCE")" '.hooks = $hooks' "$SETTINGS_FILE" > "$SETTINGS_FILE.tmp" 2>/dev/null
+            mv "$SETTINGS_FILE.tmp" "$SETTINGS_FILE"
+            printf "${GREEN}[OK]${NC} Hooks added to settings.json\n"
+        fi
+    else
+        echo '{}' | jq --argjson hooks "$(jq '.hooks' "$HOOKS_SOURCE")" '. + {hooks: $hooks}' > "$SETTINGS_FILE"
+        printf "${GREEN}[OK]${NC} settings.json created with hooks\n"
+    fi
+fi
+
+echo ""
+printf "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
+printf "${GREEN}[KUARK]${NC} Setup complete!\n"
+printf "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
+echo ""
+printf "  ${CYAN}Agents:${NC}   16 specialized AI agents\n"
+printf "  ${CYAN}Skills:${NC}   10 skill modules\n"
+printf "  ${CYAN}Hooks:${NC}    SessionStart, PreToolUse, PostToolUse, Stop\n"
+echo ""
+printf "  Start Claude Code in any project and say ${YELLOW}'proje baslat'${NC}\n"
+echo ""
