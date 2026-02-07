@@ -3,13 +3,15 @@
 # Run after: brew install kuark-system
 set -e
 
-# Detect prefix: Homebrew symlink or direct install
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-if [ -L "$SCRIPT_DIR/kuark-setup" ]; then
-    KUARK_PREFIX="$(cd "$(dirname "$(readlink "$SCRIPT_DIR/kuark-setup")")" && cd .. && pwd)"
-else
-    KUARK_PREFIX="$(cd "$SCRIPT_DIR/.." && pwd)"
+# Detect prefix: resolve symlink to find Homebrew Cellar path
+SELF="$0"
+if [ -L "$SELF" ]; then
+    # Resolve relative symlink
+    SELF_DIR="$(cd "$(dirname "$SELF")" && pwd)"
+    LINK_TARGET="$(readlink "$SELF")"
+    SELF="$SELF_DIR/$LINK_TARGET"
 fi
+KUARK_PREFIX="$(cd "$(dirname "$SELF")/.." && pwd)"
 
 KUARK_HOME="$HOME/.kuark"
 CLAUDE_HOME="$HOME/.claude"
