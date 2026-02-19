@@ -120,6 +120,7 @@ Route requests to the appropriate skill module:
 | schema, migration, model, Prisma, database, relation, index, constraint | `prisma` |
 | processor, job, BullMQ, queue, worker, background, scheduled | `queue` |
 | deploy, Docker, Railway, Nixpacks, compose, CI/CD, GitHub Actions | `devops` |
+| Coolify, coolify deploy, self-hosted deploy, coolify API, coolify servis | `coolify` |
 | auth, JWT, guard, RBAC, permission, security, OWASP, encryption | `security` |
 | endpoint, REST, DTO, validation, response, API | `api` |
 | UI, Tailwind, Radix, shadcn, component, state, styling | `ui` |
@@ -368,6 +369,7 @@ export function DataList() {
 | `python` | ~/.kuark/skills/python/ | Python microservices |
 | `architect` | ~/.kuark/skills/architect/ | Architecture decisions |
 | `pencil` | ~/.kuark/skills/pencil/ | Pencil MCP ile UI tasarimi |
+| `coolify` | skills/coolify/ | Coolify self-hosted deploy |
 
 ---
 
