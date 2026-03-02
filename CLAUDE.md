@@ -49,13 +49,17 @@ When user says "proje baslat", "yeni proje", or similar, follow this automatic c
 **Phase 2: Project Manager**
 1. Activate `project-manager` role, read `~/.kuark/agents/project-manager/SKILL.md`
 2. Read `.swarm/backlog.json` for user stories
-3. Start sprint: `bash ~/.kuark/hooks/swarm.sh sprint start "Sprint 1" "Sprint hedefi"`
-4. Create tasks for each user story:
+3. **KRITIK: ONCE sprint baslat** (task'lardan MUTLAKA once):
+   ```bash
+   bash ~/.kuark/hooks/swarm.sh sprint start "Sprint 1" "Sprint hedefi"
+   ```
+4. Sprint basariyla olusturuldugunu dogrula (ciktida "Started:" mesaji gorulmeli)
+5. **SONRA task'lari olustur** (her biri aktif sprint'e otomatik baglanir):
    ```bash
    bash ~/.kuark/hooks/swarm.sh task create "Task Title" "assigned-agent" "priority" "US-XXX"
    ```
-5. Execute: `bash ~/.kuark/hooks/swarm.sh handoff project-manager architect`
-6. Announce: "Sprint planlandi, X task olusturuldu. Mimari tasarima geciyorum."
+6. Execute: `bash ~/.kuark/hooks/swarm.sh handoff project-manager architect`
+7. Announce: "Sprint planlandi, X task olusturuldu. Mimari tasarima geciyorum."
 
 **Phase 3: Architect**
 1. Activate `architect` role, read `~/.kuark/agents/architect/SKILL.md`
@@ -121,6 +125,7 @@ Route requests to the appropriate skill module:
 | processor, job, BullMQ, queue, worker, background, scheduled | `queue` |
 | deploy, Docker, Railway, Nixpacks, compose, CI/CD, GitHub Actions | `devops` |
 | Coolify, coolify deploy, self-hosted deploy, coolify API, coolify servis | `coolify` |
+| Hadron, hadron deploy, hadron servis, Dokploy | `hadron` |
 | auth, JWT, guard, RBAC, permission, security, OWASP, encryption | `security` |
 | endpoint, REST, DTO, validation, response, API | `api` |
 | UI, Tailwind, Radix, shadcn, component, state, styling | `ui` |
@@ -203,6 +208,7 @@ Activate specialized agents based on context:
 ### Infrastructure
 - Docker multi-stage builds
 - Railway / Nixpacks
+- Hadron (Dokploy fork) self-hosted PaaS
 - GitHub Actions CI/CD
 - PostgreSQL 16+, Redis 7+
 
@@ -369,7 +375,8 @@ export function DataList() {
 | `python` | ~/.kuark/skills/python/ | Python microservices |
 | `architect` | ~/.kuark/skills/architect/ | Architecture decisions |
 | `pencil` | ~/.kuark/skills/pencil/ | Pencil MCP ile UI tasarimi |
-| `coolify` | skills/coolify/ | Coolify self-hosted deploy |
+| `coolify` | ~/.kuark/skills/coolify/ | Coolify self-hosted deploy |
+| `hadron` | ~/.kuark/skills/hadron/ | Hadron (Dokploy fork) deploy |
 
 ---
 
@@ -446,19 +453,21 @@ bash ~/.kuark/hooks/swarm.sh init "project-name"    # Create .swarm/
 bash ~/.kuark/hooks/swarm.sh status                  # Check status
 ```
 
+### Sprint Management (ONCE sprint, SONRA task!)
+```bash
+bash ~/.kuark/hooks/swarm.sh sprint start "Sprint 1" "Goal"   # 1. ONCE sprint baslat
+bash ~/.kuark/hooks/swarm.sh sprint status
+bash ~/.kuark/hooks/swarm.sh sprint end
+```
+
 ### Task Management
 ```bash
-bash ~/.kuark/hooks/swarm.sh task create "Title" "agent" "priority" "US-XXX"
+bash ~/.kuark/hooks/swarm.sh task create "Title" "agent" "priority" "US-XXX"  # 2. SONRA task olustur
 bash ~/.kuark/hooks/swarm.sh task update TASK-001 in-progress
 bash ~/.kuark/hooks/swarm.sh task list
 ```
 
-### Sprint Management
-```bash
-bash ~/.kuark/hooks/swarm.sh sprint start "Sprint 1" "Goal"
-bash ~/.kuark/hooks/swarm.sh sprint status
-bash ~/.kuark/hooks/swarm.sh sprint end
-```
+> **Not:** Task olusturulurken aktif sprint yoksa otomatik olarak yeni bir sprint baslatilir.
 
 ### Agent Handoff
 ```bash

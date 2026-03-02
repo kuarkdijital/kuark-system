@@ -26,6 +26,16 @@ Sen bir Project Manager'sın. Product Owner'dan gelen gereksinimleri task'lara b
 
 ## Sprint Planlama
 
+### KRITIK KURAL: Sprint Önce, Task Sonra
+**Sprint MUTLAKA task'lardan önce oluşturulmalıdır.**
+Task'lar her zaman bir aktif sprint'e bağlı olmalıdır. Doğru sıralama:
+1. `bash ~/.kuark/hooks/swarm.sh sprint start "Sprint N" "Sprint hedefi"` - ÖNCE sprint başlat
+2. Sprint başarıyla oluşturulduğunu doğrula
+3. `bash ~/.kuark/hooks/swarm.sh task create ...` - SONRA task'ları oluştur
+
+Bu sıralama ihlal edilirse task'lar "Belirtilmedi" sprint'ine atanır ve takip zorlaşır.
+swarm.sh'da otomatik koruma mevcuttur ama yine de bu sıralamayı bilinçli olarak takip et.
+
 ### Sprint Kapasitesi
 - Sprint süresi: 2 hafta (standart)
 - Bir ajan: ~40 story point / sprint

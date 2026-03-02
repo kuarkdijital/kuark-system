@@ -257,6 +257,18 @@ swarm_task() {
             local priority="${3:-medium}"
             local story="${4:-}"
 
+            # GUARD: Ensure active sprint exists before creating tasks
+            local _sprint_status="not_started"
+            if [ -f "$SWARM_DIR/current-sprint.json" ]; then
+                _sprint_status=$(jq -r '.status // "not_started"' "$SWARM_DIR/current-sprint.json" 2>/dev/null)
+            fi
+            if [ "$_sprint_status" != "active" ]; then
+                echo -e "${YELLOW}[SWARM]${NC} No active sprint found. Creating tasks requires an active sprint."
+                echo -e "${YELLOW}[SWARM]${NC} Auto-starting a new sprint..."
+                swarm_sprint start "" ""
+                echo -e "${GREEN}[SWARM]${NC} Sprint started. Proceeding with task creation."
+            fi
+
             # Sync counter from actual files first
             sync_counters 2>/dev/null
 
