@@ -7,6 +7,10 @@ argument-hint: [proje-adı]
 
 Yeni bir Kuark projesi başlat. Sub-agent dispatch zincirini yürüt — sen (main Claude) **orchestrator**'sın ve **tek ledger writer**'sın.
 
+## KRİTİK: Tüm kullanıcı soruları AskUserQuestion ile
+
+Bu komut boyunca (PO wizard, PM sprint goal, Architect karar onayları, dispatch onayı, vb.) kullanıcıya yöneltilen **her soru `AskUserQuestion` tool'u ile sorulmalı**. Free-text chat soru sorma. 2-4 seçenek ver, "Other" otomatik eklenir. Sub-agent dispatch prompt'larında bu kuralı **açıkça belirt**.
+
 ## Adım 0: Hazırlık
 
 ```bash
@@ -20,15 +24,18 @@ kuark status
 
 `kuark-product-owner` sub-agent'ını çağır (Agent tool ile). Prompt:
 
-> Yeni bir Kuark projesi başlatıyoruz. Kullanıcıyla AskUserQuestion ile etkileşimli wizard yürüt:
+> Yeni bir Kuark projesi başlatıyoruz. Kullanıcıyla **yalnızca `AskUserQuestion` tool'u ile** etkileşimli wizard yürüt — her adımda 2-4 seçenek sun, asla free-text chat sorusu sorma. "Other" seçeneği otomatik eklenir, kullanıcı serbest cevap vermek isterse onu kullanır. Wizard adımları:
 >
-> 1. **Vizyon**: Bu proje hangi sorunu çözüyor, kim için?
-> 2. **Kimlik**: İsim, marka, hedef kitle
-> 3. **Teknik yapı**: Backend (NestJS varsayılan), Frontend (Next.js varsayılan), DB, Queue
-> 4. **Uygulamalar**: Hangi modüller (auth, payment, admin, ...)
-> 5. **Entegrasyonlar**: 3rd party API'ler (iyzico, banka POS, ...)
-> 6. **Deploy hedefi**: Railway / Hadron / Docker / başka
-> 7. **MVP scope**: İlk versiyonda mutlaka olması gerekenler
+> 1. **Vizyon kategorisi**: B2B SaaS / B2C platform / İç araç / E-ticaret / Marketplace
+> 2. **Hedef sektör**: Finans / E-ticaret / Saglık / Eğitim / Lojistik / Diğer
+> 3. **Backend**: NestJS (varsayılan) / FastAPI / Hibrit
+> 4. **Frontend**: Next.js 15 App Router (varsayılan) / Next.js Pages / Sadece API
+> 5. **Veritabanı**: PostgreSQL (varsayılan) / MySQL / MongoDB
+> 6. **Queue/Background**: BullMQ+Redis (varsayılan) / Hiç / Diğer
+> 7. **Modüller** (multiSelect=true): auth / payment / admin-panel / notifications / file-upload / reporting / billing / api-docs
+> 8. **Ödeme entegrasyonu**: iyzico / Vakıfbank POS / Halkbank POS / Ziraat POS / Yok
+> 9. **Deploy hedefi**: Railway / Hadron self-hosted / Docker (manuel) / Vercel + Railway
+> 10. **MVP scope**: Sadece auth+core / +1 ana feature / Tam featureset
 >
 > Topladığın bilgilerden 5-15 user story üret (US-001, US-002, ...). Her biri:
 > - id, title, story (As a... I want... so that...)

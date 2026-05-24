@@ -7,9 +7,16 @@ argument-hint: <TASK-ID> [TASK-ID...]
 
 Bir veya daha fazla task'ı paralel sub-agent dispatch ile çalıştır.
 
+## KRİTİK: Kullanıcı seçimi AskUserQuestion ile
+
+Argüman boşsa, dispatch öncesi onay, bağımlılık çözümü gibi tüm kullanıcı etkileşimleri **`AskUserQuestion` tool'u ile**. Free-text chat sorusu yasak. Task seçiminde `multiSelect: true` kullan (birden çok task seçilebilsin), options olarak `kuark tasks --status planned` çıktısından TASK-ID + title pair'leri ver.
+
 ## Adımlar
 
-1. **Argümanları parse et**: Boşluk-ayraçlı TASK-ID listesi. Boşsa kullanıcıya AskUserQuestion ile mevcut planned task'lardan seçtir.
+1. **Argümanları parse et**: Boşluk-ayraçlı TASK-ID listesi. Boşsa:
+   - `kuark tasks --status planned` çıktısını oku
+   - `AskUserQuestion` ile (multiSelect=true) hangi task'ların dispatch edileceğini seçtir
+   - Her option: label="TASK-XXX: <title kısaltma>", description="assignee, priority"
 
 2. **Her task için**:
    - `kuark task show TASK-XXX` ile assignee + detayları al

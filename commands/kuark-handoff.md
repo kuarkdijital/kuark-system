@@ -7,6 +7,10 @@ argument-hint: <to-agent> [TASK-ID]
 
 Aktif ajandan `$ARGUMENTS`'taki ilk argümana handoff yap.
 
+## KRİTİK: Kullanıcı soruları AskUserQuestion ile
+
+Hedef ajan, task ID veya özet eksikse `AskUserQuestion` tool'u ile sor — free-text chat sorusu kullanma. Geçerli ajan listesini option olarak ver (kuark-product-owner, kuark-architect, kuark-nestjs-developer, vs.).
+
 ## Adımlar
 
 1. **Aktif ajanı oku**:
@@ -15,7 +19,10 @@ Aktif ajandan `$ARGUMENTS`'taki ilk argümana handoff yap.
    echo "From: $FROM"
    ```
 
-2. **Argümanları parse et**: `$ARGUMENTS` formatı `<to-agent> [TASK-ID]`. Boşluksa kullanıcıya AskUserQuestion ile sor.
+2. **Argümanları parse et**: `$ARGUMENTS` formatı `<to-agent> [TASK-ID]`. Boşsa:
+   - `kuark agent list` ile geçerli ajanları al
+   - `AskUserQuestion` ile "Hedef ajan?" sorusunu sor, options olarak ajan listesini ver
+   - Hangi task'a bağlı olduğunu sormak için ayrı bir `AskUserQuestion` (`kuark tasks --status in-progress` çıktısından options türet)
 
 3. **Aktif sub-agent'a DRAFT handoff yazdır** (eğer henüz yoksa):
    - `ls -t .swarm/handoffs/HOFF-DRAFT-*.md 2>/dev/null` ile kontrol et

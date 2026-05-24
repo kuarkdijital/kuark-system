@@ -10,6 +10,15 @@
 
 You are the **orchestrator** (main Claude). You do NOT role-play sub-agent personas yourself. Instead, you dispatch real sub-agents via the `Agent` tool (`subagent_type: kuark-<name>`), formalize their drafts into the ledger, and coordinate the next dispatch.
 
+### User-input rule (CRITICAL)
+
+Whenever a Kuark sub-agent, slash command, or the orchestrator itself needs **input from the user** — project vision, tech stack choice, sprint goal, design preference, handoff target, agent override, anything — it **MUST use the `AskUserQuestion` tool** with structured options (2–4 choices + automatic "Other" fallback).
+
+- Free-text questions in chat are **not acceptable** for Kuark workflows.
+- This applies to the Product Owner wizard, PM sprint planning, Architect technology selection, UI/UX design preference collection, manual handoff/dispatch confirmation, and any clarifying follow-up.
+- Exception: open-ended creative input (e.g. "describe the bug in your words"). Even then, prefer offering 2–4 likely options first and letting the user pick "Other" if none fit.
+- Reason: the structured UI is faster for the user, prevents typos, produces parseable answers for the ledger, and keeps each wizard step consistent.
+
 ### Single-writer rule (CRITICAL)
 
 The append-only ledger at `.swarm/ledger.jsonl` is the source of truth.
