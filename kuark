@@ -1,0 +1,208 @@
+#!/bin/bash
+# kuark — Multi-agent development CLI
+# Append-only ledger + auto-rendered views + sub-agent dispatch helpers
+#
+# Source of truth: .swarm/ledger.jsonl
+# Derived:         .swarm/state.json, .swarm/views/*.md
+
+set -u
+
+# Locate KUARK_HOME (where lib/ lives). Resolves real path of this script.
+SCRIPT_PATH="${BASH_SOURCE[0]}"
+while [ -L "$SCRIPT_PATH" ]; do
+  DIR="$(cd -P "$(dirname "$SCRIPT_PATH")" && pwd)"
+  SCRIPT_PATH="$(readlink "$SCRIPT_PATH")"
+  [[ "$SCRIPT_PATH" != /* ]] && SCRIPT_PATH="$DIR/$SCRIPT_PATH"
+done
+KUARK_HOME="${KUARK_HOME:-$(cd -P "$(dirname "$SCRIPT_PATH")" && pwd)}"
+LIB="$KUARK_HOME/lib"
+
+[ -d "$LIB" ] || { echo "kuark: lib/ not found at $LIB" >&2; exit 1; }
+
+source "$LIB/_common.sh"
+require_jq
+
+# Lazy-source modules as commands are dispatched
+load_mod() { source "$LIB/$1.sh"; }
+
+usage() {
+  cat <<'EOF'
+kuark — Multi-agent development CLI
+
+USAGE
+  kuark <command> [args]
+
+PROJECT
+  init [name]                       Initialize .swarm/ in current directory
+  status                            Quick overview (project, sprint, counts)
+  repair                            Recreate missing dirs + replay ledger
+  replay                            Force rebuild state.json + views/ from ledger
+  render                            Regenerate views/*.md
+
+STORIES (Product Owner)
+  story add "title" [priority] [effort]
+  story list
+
+SPRINTS (Project Manager)
+  sprint start "name" "goal"
+  sprint end
+  sprint status
+
+TASKS
+  task create "title" <assignee> [priority] [story-id]
+  task update <id> <status>         status: planned|in-progress|review|blocked|done
+  task list [--status X] [--agent Y]
+  task show <id>
+  tasks                             Alias for `task list`
+
+HANDOFFS (agent → agent)
+  handoff <from> <to> [--task ID] [--summary "..."] [--payload PATH]
+  handoffs                          List recent handoffs
+
+DECISIONS (ADRs)
+  decide "topic" "outcome" [rationale]
+  decisions                         List recent decisions
+
+AGENT
+  agent set <name>                  Change active agent (writes ledger event)
+  agent current                     Print active agent
+  agent list                        Valid agent names
+
+LEDGER
+  log [--tail N] [--type T]         Show recent events
+  events                            Total event count
+
+EXAMPLES
+  kuark init my-project
+  kuark story add "User can login" must_have M
+  kuark sprint start "Sprint 1" "MVP auth + dashboard"
+  kuark task create "Build auth module" nestjs-developer high US-001
+  kuark task update TASK-001 in-progress
+  kuark handoff architect nestjs-developer --task TASK-001 --summary "ADR-003 done"
+  kuark decide "auth library" "jose over jsonwebtoken" "edge runtime support"
+  kuark status
+
+ENV
+  KUARK_AGENT      Name to attribute events to (defaults vary by command)
+  KUARK_SWARM_DIR  Override .swarm location (default: .swarm)
+EOF
+}
+
+cmd_status() {
+  require_swarm
+  load_mod state
+  load_mod views
+
+  state_get | jq -r '
+    "── Project ──",
+    if .project then "  \(.project.name) — \(.project.description // "")" else "  (uninitialized)" end,
+    "",
+    "── Agent ──",
+    "  current:  \(.agent.current // "—")",
+    "  previous: \(.agent.previous // "—")",
+    "",
+    "── Sprint ──",
+    if .sprint.current then "  \(.sprint.current.id) — \(.sprint.current.name)" else "  (no active sprint)" end,
+    "",
+    "── Snapshot ──",
+    "  tasks:     \(.stats.tasks_total) total · \(.stats.tasks_done) done · \(.stats.tasks_in_progress) in-progress · \(.stats.tasks_planned) planned · \(.stats.tasks_review) review · \(.stats.tasks_blocked) blocked",
+    "  stories:   \(.stats.stories_total)",
+    "  decisions: \(.stats.decisions_total)",
+    "  handoffs:  \(.stats.handoffs_total)"
+  '
+}
+
+cmd_log() {
+  require_swarm
+  load_mod ledger
+  local n=20
+  local type_filter=""
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --tail) n="$2"; shift 2 ;;
+      --type) type_filter="$2"; shift 2 ;;
+      *) shift ;;
+    esac
+  done
+  if [ -n "$type_filter" ]; then
+    ledger_read "$type_filter" | tail -n "$n" | jq -r '"\(.ts)  \(.type | . + "                    " | .[0:18])  \(.by | . + "          " | .[0:16])  \(.data | tostring | .[0:80])"'
+  else
+    ledger_tail "$n" | jq -r '"\(.ts)  \(.type | . + "                    " | .[0:18])  \(.by | . + "          " | .[0:16])  \(.data | tostring | .[0:80])"'
+  fi
+}
+
+cmd_events() {
+  require_swarm
+  load_mod ledger
+  ledger_count
+}
+
+# ─── Dispatch ──────────────────────────────────────────────
+cmd="${1:-status}"
+shift 2>/dev/null || true
+
+case "$cmd" in
+  -h|--help|help)         usage ;;
+  init)                   load_mod init;     cmd_init "$@" ;;
+  status)                 cmd_status ;;
+  repair)                 load_mod init;     cmd_repair ;;
+  replay)                 load_mod init;     cmd_replay ;;
+  render)                 load_mod init;     cmd_render ;;
+
+  story)
+    sub="${1:-list}"; shift 2>/dev/null || true
+    load_mod story
+    case "$sub" in
+      add)  cmd_story_add "$@" ;;
+      list) cmd_story_list ;;
+      *)    die "Unknown: story $sub" ;;
+    esac
+    ;;
+
+  sprint)
+    sub="${1:-status}"; shift 2>/dev/null || true
+    load_mod sprint
+    case "$sub" in
+      start)  cmd_sprint_start "$@" ;;
+      end)    cmd_sprint_end ;;
+      status) cmd_sprint_status ;;
+      *)      die "Unknown: sprint $sub" ;;
+    esac
+    ;;
+
+  task)
+    sub="${1:-list}"; shift 2>/dev/null || true
+    load_mod task
+    case "$sub" in
+      create) cmd_task_create "$@" ;;
+      update) cmd_task_update "$@" ;;
+      list)   cmd_task_list "$@" ;;
+      show)   cmd_task_show "$@" ;;
+      *)      die "Unknown: task $sub" ;;
+    esac
+    ;;
+
+  tasks)            load_mod task;    cmd_task_list "$@" ;;
+
+  handoff)          load_mod handoff; cmd_handoff "$@" ;;
+  handoffs)         load_mod handoff; cmd_handoff_list ;;
+
+  decide)           load_mod decide;  cmd_decide "$@" ;;
+  decisions)        load_mod decide;  cmd_decide_list ;;
+
+  agent)
+    sub="${1:-current}"; shift 2>/dev/null || true
+    load_mod agent
+    case "$sub" in
+      set)     cmd_agent_set "$@" ;;
+      current) cmd_agent_current ;;
+      list)    cmd_agent_list ;;
+      *)       die "Unknown: agent $sub" ;;
+    esac
+    ;;
+
+  log)              cmd_log "$@" ;;
+  events)           cmd_events ;;
+
+  *) usage; exit 1 ;;
+esac

@@ -1,6 +1,15 @@
 # Kuark Universal Development System
 
-Kuark ekibi icin multi-agent development sistemi. Claude Code uzerinden 15 uzman AI agent ile full-stack NestJS + Next.js gelistirme orkestrasyon sistemi.
+Kuark ekibi icin Claude Code uzerinde **parallel sub-agent + append-only ledger** mimarisiyle calisan multi-agent development sistemi. 17 uzman AI sub-agent, structured handoff'lar, otomatik dashboard.
+
+## Mimari (v2 — Sub-Agent + Ledger)
+
+- **17 sub-agent** Claude Code native formatinda (`~/.claude/agents/kuark-*.md`). Her biri kendi izole context'inde, paralel calisabilir.
+- **Append-only ledger** (`.swarm/ledger.jsonl`) tek hakikat kaynagi. Race condition yok — sadece orchestrator (main Claude) yazar.
+- **Auto-rendered views** (`.swarm/views/*.md`) — tasks.md, dashboard.md, by-agent.md, timeline.md her event sonrasi yeniden uretilir.
+- **Structured handoff payloads** — agent'lar arasi sifir context kaybi.
+- **Slash commands**: `/kuark-proje-baslat`, `/kuark-tasks`, `/kuark-handoff`, `/kuark-dispatch`, `/kuark-agent`, `/kuark-durum`.
+- **`kuark` CLI** — ledger yazimi, state derivation, view rendering tek binary'de.
 
 ## Hizli Kurulum
 
@@ -37,84 +46,124 @@ bash ~/.kuark/install.sh
 - git
 - jq (`brew install jq` / `apt-get install jq`)
 
-## Agent Listesi
+## Sub-Agent Listesi
 
-| Agent | Rol |
-|-------|-----|
-| `product-owner` | Vizyon, gereksinimler, backlog, onceliklendirme |
-| `project-manager` | Sprint planlama, task dagilimi, ilerleme takibi |
-| `analyst` | Gereksinim analizi, user story yazimi |
-| `architect` | Sistem tasarimi, ADR, teknoloji secimi |
-| `nestjs-developer` | Backend API gelistirme |
-| `nextjs-developer` | Frontend gelistirme |
-| `database-engineer` | Prisma schema, migration, query optimizasyonu |
-| `queue-developer` | BullMQ background job'lar |
-| `qa-engineer` | Test stratejisi, unit/integration/e2e testler |
-| `security-engineer` | Guvenlik audit, RBAC, OWASP |
-| `devops-engineer` | Docker, CI/CD, Railway deployment |
-| `api-researcher` | 3rd party API entegrasyonlari (iyzico, bankalar) |
-| `documentation` | README, Swagger, teknik dokumantasyon |
-| `python-developer` | FastAPI microservice'ler |
+Claude Code'da `Agent(subagent_type="kuark-<name>", prompt="...")` ile cagrilir.
+
+| Agent | Model | Rol |
+|-------|-------|-----|
+| `kuark-product-owner` | sonnet | Vizyon, gereksinimler, backlog, wizard |
+| `kuark-project-manager` | sonnet | Sprint planlama, task dagilimi, kapasite |
+| `kuark-analyst` | sonnet | User story analizi, kabul kriterleri |
+| `kuark-architect` | **opus** | Sistem tasarimi, ADR, teknoloji secimi |
+| `kuark-nestjs-developer` | **opus** | Backend API: controller, service, guard, DTO |
+| `kuark-nextjs-developer` | **opus** | Frontend: App Router, RSC, components |
+| `kuark-database-engineer` | **opus** | Prisma schema, migration, multi-tenant |
+| `kuark-queue-developer` | **opus** | BullMQ processor, background jobs |
+| `kuark-python-developer` | **opus** | FastAPI mikroservis |
+| `kuark-qa-engineer` | **opus** | Unit/integration/E2E testler |
+| `kuark-security-engineer` | **opus** | Guvenlik audit, RBAC, OWASP |
+| `kuark-devops-engineer` | **opus** | Docker, CI/CD, Railway/Hadron deploy |
+| `kuark-hadron-engineer` | sonnet | Hadron (Dokploy fork) self-hosted PaaS |
+| `kuark-ui-ux-designer` | sonnet | Wireframe, mockup, design system (Pencil MCP) |
+| `kuark-api-researcher` | sonnet | 3rd party API arastirma (iyzico, bankalar) |
+| `kuark-documentation` | sonnet | README, API docs, teknik dokumantasyon |
+| `kuark-orchestrator` | sonnet | Multi-agent koordinasyon (genelde main Claude bu rolu yapar) |
+
+**Model atamasi:** kod yazan + yuksek bahisli karar veren ajanlar `opus`, planlama/koordinasyon/arastirma `sonnet`. Hicbir ajan `haiku` degil.
 
 ## Kullanim
 
 ### Yeni Proje Baslatma
 
-Claude Code'u herhangi bir proje dizininde baslatin:
+Herhangi bir proje dizininde Claude Code'da:
 
 ```
-> proje baslat
+/kuark-proje-baslat
 ```
 
-Product Owner otomatik olarak aktif olur, sorular sorar, user story'ler yazar. Sonra Project Manager'a gecer, sprint planlar ve task'lari dagitir.
+Orchestrator (main Claude) sirasiyla **kuark-product-owner**, **kuark-project-manager**, **kuark-architect** sub-agent'larini dispatch eder. Ardindan bagimsiz task'lar paralel sub-agent dispatch ile baslar.
 
-### Swarm Durumu
-
-```
-> durumu goster
-> sprint durumu
-> task listesi
-```
-
-### Agent Degistirme
+### Durum & Task Takibi
 
 ```
-> agent degistir: nestjs-developer
+/kuark-durum                              # Genel durum + son aktivite
+/kuark-tasks                              # Tum task tablosu
+/kuark-tasks --status in-progress         # Filtreli
+/kuark-tasks --agent nextjs-developer
+
+cat .swarm/views/dashboard.md             # Tam dashboard
+cat .swarm/views/tasks.md                 # Task'lar grupli
+cat .swarm/views/by-agent.md              # Ajan basina dagilim
+cat .swarm/views/timeline.md              # Kronolojik aktivite
+```
+
+`.swarm/views/tasks.md`'i editor'de acik tutarsaniz canli dashboard gibi calisir — her `kuark` komutu sonrasi yeniden render edilir.
+
+### Manuel Handoff & Dispatch
+
+```
+/kuark-handoff <to-agent> [TASK-ID]       # Aktif ajandan handoff
+/kuark-dispatch TASK-001 TASK-002         # Birden fazla task'i paralel dispatch
+/kuark-agent <name>                       # Aktif ajani degistir
+```
+
+### CLI Dogrudan Kullanim
+
+```bash
+kuark init "proje-adi"
+kuark story add "Login flow" must_have S
+kuark sprint start "Sprint 1" "MVP auth"
+kuark task create "Build API" nestjs-developer high US-001
+kuark task update TASK-001 in-progress
+kuark task update TASK-001 done
+kuark handoff architect nestjs-developer --task TASK-002 --summary "ADR-003 done"
+kuark decide "ORM" "Prisma" "Multi-tenant + DX"
+kuark status
+kuark log --tail 20
 ```
 
 ## Dizin Yapisi
 
 ```
-~/.kuark/
-├── agents/          # 15 agent SKILL.md dosyalari
-├── hooks/           # Claude Code hook script'leri
-├── skills/          # 10 modul MODULE.md dosyalari
-├── templates/       # NestJS, NextJS, Prisma, Docker sablonlari
-├── references/      # API format, error codes, deployment, caching
-├── CLAUDE.md        # Ana direktifler (~/.claude/CLAUDE.md'ye inject edilir)
-├── CONVENTIONS.md   # Kodlama standartlari
-├── install.sh       # Kurulum
-├── update.sh        # Guncelleme
-└── uninstall.sh     # Kaldirma
+~/.kuark/                              # Kuark kaynak (clone edilen repo)
+├── kuark                              # Ana CLI (sembol link ~/.local/bin/kuark)
+├── lib/                               # CLI modulleri (ledger, state, views, ...)
+├── bin/                               # Yardimcilar (generate-claude-agents.sh, ...)
+├── commands/                          # Slash command tanimlari
+├── agents/<name>/SKILL.md             # Sub-agent domain bilgisi (kaynak)
+├── hooks/                             # Claude Code hook'lari + swarm.sh shim
+├── skills/                            # 13 modul MODULE.md dosyalari
+├── templates/                         # NestJS, NextJS, Prisma, Docker sablonlari
+├── references/                        # API format, error codes, deployment, ...
+├── CLAUDE.md                          # Ana direktifler (~/.claude/CLAUDE.md'ye inject)
+├── CONVENTIONS.md                     # Kodlama standartlari
+└── install.sh / update.sh / uninstall.sh
+
+~/.claude/                             # Claude Code kullanici dizini
+├── agents/kuark-*.md                  # 17 sub-agent (install.sh tarafindan uretilir)
+├── commands/kuark-*.md                # Slash command'lar
+└── CLAUDE.md                          # Kuark direktifleri buraya inject edilir
 ```
 
-### Proje Bazli (.swarm/)
+### Proje Bazli (`.swarm/`)
 
-Her projede otomatik olusturulur:
+`kuark init` ile her projede olusturulur:
 
 ```
 .swarm/
-├── project.json           # Proje metadata
-├── backlog.json           # Product backlog (user stories)
-├── current-sprint.json    # Aktif sprint
-├── tasks/                 # TASK-XXX.task.md dosyalari
-├── sprints/               # Sprint arsivi
-├── handoffs/              # Agent handoff log'lari
-├── communications/        # Agent-arasi mesajlar
-└── context/
-    ├── active-agent.json  # Aktif agent takibi
-    └── decisions.json     # Mimari kararlar (ADR)
+├── ledger.jsonl                       # Kalp — append-only event log (source of truth)
+├── state.json                         # Cache — ledger'dan turetilen current state
+├── views/
+│   ├── tasks.md                       # Tum task'lar (status'a gore grupli)
+│   ├── dashboard.md                   # Proje genel bakis
+│   ├── by-agent.md                    # Ajan basina dagilim
+│   └── timeline.md                    # Son 50 event kronolojik
+├── handoffs/HOFF-*.md                 # Structured handoff payload'lari
+└── decisions/DEC-*.md                 # Mimari kararlar (ADR'ler)
 ```
+
+`state.json` ve `views/*.md` her `kuark` komutu sonrasi yeniden uretilir — manuel duzenleme. `ledger.jsonl` append-only, sadece son care olarak duzenle (sonra `kuark replay`).
 
 ## Teknoloji Stack
 

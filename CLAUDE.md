@@ -6,106 +6,106 @@
 
 ---
 
-## Automatic Orchestration Protocol
+## Sub-Agent Dispatch Protocol (v2 — parallel, ledger-backed)
 
-### Session Start Behavior
+You are the **orchestrator** (main Claude). You do NOT role-play sub-agent personas yourself. Instead, you dispatch real sub-agents via the `Agent` tool (`subagent_type: kuark-<name>`), formalize their drafts into the ledger, and coordinate the next dispatch.
 
-When a Claude Code session starts in any project:
-1. The SessionStart hook auto-initializes `.swarm/` if missing
-2. `.swarm/context/active-agent.json` determines the current agent
-3. If no active agent exists, default to `product-owner`
-4. The agent's SKILL.md is loaded from `~/.kuark/agents/{agent}/SKILL.md`
-5. Greet the user in the active agent's role
-6. Follow the agent's protocol from its SKILL.md
+### Single-writer rule (CRITICAL)
 
-### "Proje Baslat" Automatic Flow
+The append-only ledger at `.swarm/ledger.jsonl` is the source of truth.
 
-When user says "proje baslat", "yeni proje", or similar, follow this automatic chain:
+- **Only YOU (orchestrator) write to the ledger** — always through the `kuark` CLI.
+- Sub-agents write **DRAFT** files only: `.swarm/handoffs/HOFF-DRAFT-*.md` and `.swarm/decisions/DEC-DRAFT-*.md`.
+- After each sub-agent returns, YOU read their DRAFTs and call `kuark handoff` / `kuark decide` / `kuark task update` to formalize.
+- This eliminates race conditions when multiple sub-agents run in parallel.
 
-**Phase 1: Product Owner**
-1. Activate `product-owner` role
-2. Ask the questions from `~/.kuark/agents/product-owner/SKILL.md`
-3. Gather requirements from user (vizyon, kapsam, teknik gereksinimler)
-4. Write user stories to `.swarm/backlog.json` in this format:
-   ```json
-   {
-     "items": [
-       {
-         "id": "US-001",
-         "title": "...",
-         "story": "Kullanici olarak... istiyorum ki... boylece...",
-         "priority": "must_have",
-         "effort": "M",
-         "acceptance_criteria": ["..."],
-         "technical_notes": "..."
-       }
-     ]
-   }
-   ```
-5. Update `.swarm/project.json` with project details
-6. Execute: `bash ~/.kuark/hooks/swarm.sh handoff product-owner project-manager`
-7. Announce: "Gereksinimler toplandi. Project Manager rolune geciyorum."
+### Session start
 
-**Phase 2: Project Manager**
-1. Activate `project-manager` role, read `~/.kuark/agents/project-manager/SKILL.md`
-2. Read `.swarm/backlog.json` for user stories
-3. Start sprint: `bash ~/.kuark/hooks/swarm.sh sprint start "Sprint 1" "Sprint hedefi"`
-4. Create tasks for each user story:
-   ```bash
-   bash ~/.kuark/hooks/swarm.sh task create "Task Title" "assigned-agent" "priority" "US-XXX"
-   ```
-5. Execute: `bash ~/.kuark/hooks/swarm.sh handoff project-manager architect`
-6. Announce: "Sprint planlandi, X task olusturuldu. Mimari tasarima geciyorum."
+When a session starts in a directory:
+1. If `.swarm/` is missing → suggest `/kuark-proje-baslat` (or do not auto-init; ask first).
+2. If `.swarm/` exists → run `kuark status` and read `.swarm/views/dashboard.md`.
+3. Greet the user with a one-line summary (active agent, sprint, tasks in progress).
+4. Do **not** role-play. You are the orchestrator.
 
-**Phase 3: Architect**
-1. Activate `architect` role, read `~/.kuark/agents/architect/SKILL.md`
-2. Read tasks and backlog
-3. Make architectural decisions, write to `.swarm/context/decisions.json`
-4. Handoff to `ui-ux-designer` for UI/UX tasks, or directly to developer agents for backend-only tasks
+### "Proje başlat" → `/kuark-proje-baslat`
 
-**Phase 4: UI/UX Designer**
-1. Activate `ui-ux-designer` role, read `~/.kuark/agents/ui-ux-designer/SKILL.md`
-2. Read architectural decisions and user stories
-3. Create wireframes/mockups using Pencil MCP (.pen files)
-4. Define design system (colors, typography, spacing tokens)
-5. Write component specs for each screen
-6. Design all states: loading, error, empty, success
-7. Execute: `bash ~/.kuark/hooks/swarm.sh handoff ui-ux-designer nextjs-developer TASK-XXX "Design tamamlandi"`
-8. Announce: "Tasarimlar tamamlandi. Frontend gelistirmeye geciyorum."
+User says "proje baslat", "yeni proje", or similar → invoke `/kuark-proje-baslat`. The command sequences:
 
-**Phase 5+: Development Agents**
-Follow the standard chain per task type:
+1. `kuark init` (if needed)
+2. **Dispatch `kuark-product-owner`** with a wizard prompt → writes DRAFT backlog
+3. Orchestrator formalizes: `kuark story add ...` for each story
+4. **Dispatch `kuark-project-manager`** → writes DRAFT sprint+tasks plan
+5. Orchestrator formalizes: `kuark sprint start`, then `kuark task create ...` for each
+6. `kuark handoff product-owner project-manager` and `kuark handoff project-manager architect`
+7. **Dispatch `kuark-architect`** → writes DRAFT ADRs
+8. Orchestrator formalizes: `kuark decide ...` for each
+9. Identify independent tasks for parallel dispatch → `/kuark-dispatch TASK-001 TASK-002 TASK-003`
+
+### Parallel sub-agent dispatch
+
+**Independent tasks** (no inter-task dependency) run in **the same turn** via multiple `Agent` tool calls in one message:
+
 ```
-database-engineer → nestjs-developer → ui-ux-designer → nextjs-developer → qa-engineer → security-engineer → devops-engineer
+Agent(subagent_type="kuark-database-engineer", prompt="TASK-001: ...")
+Agent(subagent_type="kuark-api-researcher",   prompt="TASK-002: ...")
+Agent(subagent_type="kuark-ui-ux-designer",   prompt="TASK-003: ...")
 ```
 
-### Agent Transition Rules
+**Dependent tasks** (B needs A's output) run sequentially. Determine dependency from the architect's handoff or task `depends_on` notes.
 
-When transitioning between agents, ALWAYS:
-1. Run `bash ~/.kuark/hooks/swarm.sh task update TASK-XXX review` (for outgoing task)
-2. Run `bash ~/.kuark/hooks/swarm.sh handoff {current-agent} {next-agent} TASK-XXX "summary"`
-3. Read the next agent's SKILL.md: `cat ~/.kuark/agents/{next-agent}/SKILL.md`
-4. Announce the role change to the user
-5. Continue with the next agent's responsibilities
+Before dispatching, mark each in-flight task: `kuark task update TASK-XXX in-progress`.
+After each sub-agent returns, formalize its drafts and update task status accordingly (`review` if awaiting validation, `done` if fully verified).
 
-### State File Update Rules
+### Required handoff payload (sub-agent contract)
 
-ALWAYS update .swarm files as work progresses:
-- Writing user stories → update `.swarm/backlog.json`
-- Creating tasks → `bash ~/.kuark/hooks/swarm.sh task create ...`
-- Starting work on a task → `bash ~/.kuark/hooks/swarm.sh task update TASK-XXX in-progress`
-- Completing a task → `bash ~/.kuark/hooks/swarm.sh task update TASK-XXX done`
-- Changing agents → `bash ~/.kuark/hooks/swarm.sh handoff ...`
-- Making architecture decisions → update `.swarm/context/decisions.json`
+Every sub-agent **must** return a DRAFT handoff file at `.swarm/handoffs/HOFF-DRAFT-<role>-<timestamp>.md` with these sections:
 
-### Manual Override Commands
+- **What Was Done** — completed work, file paths touched
+- **Decisions Made** — DEC-DRAFT files written or inline rationale
+- **Open Questions** — for orchestrator or user
+- **Context For Next Agent** — files to read, patterns to follow, constraints
+- **Acceptance Criteria For Next Step**
 
-User can override automatic flow at any time:
-- "agent degistir: {agent-name}" → Switch to specific agent
-- "durumu goster" → Run `bash ~/.kuark/hooks/swarm.sh status`
-- "sprint durumu" → Run `bash ~/.kuark/hooks/swarm.sh sprint status`
-- "task listesi" → Run `bash ~/.kuark/hooks/swarm.sh task list`
-- "backlog goster" → Read `.swarm/backlog.json`
+This is what the sub-agent definitions enforce. If a sub-agent returns without one, ask it explicitly.
+
+### Ledger event types (what `kuark` writes)
+
+| Event | Trigger | Writer |
+|---|---|---|
+| `project.init` | `kuark init` | system |
+| `story.create` | `kuark story add` | orchestrator (after PO draft) |
+| `sprint.start` / `sprint.end` | `kuark sprint start/end` | orchestrator (after PM draft) |
+| `task.create` / `task.update` | `kuark task create/update` | orchestrator |
+| `handoff` | `kuark handoff` | orchestrator |
+| `decision` | `kuark decide` | orchestrator |
+| `agent.set` | `kuark agent set` | system/orchestrator |
+
+### Manual override commands
+
+The user can drive directly:
+
+- `/kuark-durum` → status + dashboard
+- `/kuark-tasks [--status X] [--agent Y]` → filtered task table
+- `/kuark-handoff <to> [TASK-ID]` → manual handoff
+- `/kuark-agent <name>` → switch active agent
+- `/kuark-dispatch TASK-XXX [TASK-YYY ...]` → dispatch task(s) to their assignees
+
+### State files
+
+```
+.swarm/
+├── ledger.jsonl              ← source of truth (append-only)
+├── state.json                ← cache (derived; regenerable)
+├── views/
+│   ├── tasks.md              ← all tasks, grouped by status
+│   ├── dashboard.md          ← project overview
+│   ├── by-agent.md           ← per-agent task lists
+│   └── timeline.md           ← recent activity
+├── handoffs/HOFF-XXX.md      ← formalized handoff payloads
+└── decisions/DEC-XXX.md      ← formalized ADRs
+```
+
+Never hand-edit `state.json` or `views/*.md`; they're regenerated on every event. Edit `ledger.jsonl` only as a last resort (then `kuark replay`).
 
 ---
 
@@ -438,32 +438,58 @@ Kuark projeleri için öncelikli ödeme entegrasyonları:
 
 ---
 
-## Swarm Management
+## Swarm Management — `kuark` CLI
 
-### Initialize Swarm
+Use the `kuark` CLI for all state mutations. Every command emits a ledger event
+and re-renders `.swarm/views/*.md`. Run `kuark --help` for the full list.
+
+### Initialize
 ```bash
-bash ~/.kuark/hooks/swarm.sh init "project-name"    # Create .swarm/
-bash ~/.kuark/hooks/swarm.sh status                  # Check status
+kuark init "project-name"          # Create .swarm/, write project.init event
+kuark status                        # Quick overview
+kuark replay                        # Rebuild state.json + views from ledger
 ```
 
-### Task Management
+### Stories & Sprints
 ```bash
-bash ~/.kuark/hooks/swarm.sh task create "Title" "agent" "priority" "US-XXX"
-bash ~/.kuark/hooks/swarm.sh task update TASK-001 in-progress
-bash ~/.kuark/hooks/swarm.sh task list
+kuark story add "title" must_have M
+kuark sprint start "Sprint 1" "MVP auth + dashboard"
+kuark sprint end
 ```
 
-### Sprint Management
+### Tasks
 ```bash
-bash ~/.kuark/hooks/swarm.sh sprint start "Sprint 1" "Goal"
-bash ~/.kuark/hooks/swarm.sh sprint status
-bash ~/.kuark/hooks/swarm.sh sprint end
+kuark task create "Build auth module" nestjs-developer high US-001
+kuark task update TASK-001 in-progress
+kuark task update TASK-001 done
+kuark tasks                          # tabular view
+kuark tasks --status in-progress
+kuark tasks --agent nextjs-developer
+kuark task show TASK-001             # full history
 ```
 
-### Agent Handoff
+### Handoffs (agent → agent)
 ```bash
-bash ~/.kuark/hooks/swarm.sh handoff from-agent to-agent TASK-XXX "summary"
+kuark handoff architect nestjs-developer --task TASK-005 --summary "ADR-003 done"
+# Writes HOFF-XXX.md template, appends ledger event, transitions task to review.
 ```
+
+### Decisions (ADRs)
+```bash
+kuark decide "auth library" "jose over jsonwebtoken" "Edge runtime support"
+```
+
+### Agent tracking
+```bash
+kuark agent current
+kuark agent set nestjs-developer
+kuark agent list
+```
+
+### Legacy `swarm.sh`
+
+`bash ~/.kuark/hooks/swarm.sh <cmd>` is preserved as a backwards-compat shim
+that redirects to `kuark`. New work should use `kuark` directly.
 
 > Full protocol: `~/.kuark/references/agent-handoff-protocol.md`
 

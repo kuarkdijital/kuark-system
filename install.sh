@@ -92,11 +92,61 @@ else
 fi
 
 # ─────────────────────────────────────────────────────────────
-# Step 2: Make hooks executable
+# Step 2: Make scripts executable
 # ─────────────────────────────────────────────────────────────
 
 chmod +x "$KUARK_HOME"/hooks/*.sh 2>/dev/null || true
-echo -e "${GREEN}[OK]${NC} Hook scripts made executable"
+chmod +x "$KUARK_HOME"/kuark 2>/dev/null || true
+chmod +x "$KUARK_HOME"/bin/*.sh 2>/dev/null || true
+echo -e "${GREEN}[OK]${NC} Scripts made executable"
+
+# ─────────────────────────────────────────────────────────────
+# Step 2b: Install `kuark` CLI on PATH
+# ─────────────────────────────────────────────────────────────
+
+KUARK_BIN_SRC="$KUARK_HOME/kuark"
+KUARK_BIN_INSTALLED=""
+for target in "$HOME/.local/bin" "/usr/local/bin"; do
+    if [ -d "$target" ] && [ -w "$target" ]; then
+        ln -sf "$KUARK_BIN_SRC" "$target/kuark"
+        KUARK_BIN_INSTALLED="$target/kuark"
+        echo -e "${GREEN}[OK]${NC} kuark CLI symlinked: $KUARK_BIN_INSTALLED"
+        break
+    fi
+done
+
+if [ -z "$KUARK_BIN_INSTALLED" ]; then
+    # Create ~/.local/bin if missing (very common pattern)
+    if [ ! -d "$HOME/.local/bin" ]; then
+        mkdir -p "$HOME/.local/bin"
+        ln -sf "$KUARK_BIN_SRC" "$HOME/.local/bin/kuark"
+        KUARK_BIN_INSTALLED="$HOME/.local/bin/kuark"
+        echo -e "${GREEN}[OK]${NC} Created $HOME/.local/bin and symlinked kuark there"
+        echo -e "${YELLOW}[NOTE]${NC} Ensure \$HOME/.local/bin is on your PATH:"
+        echo -e "         echo 'export PATH=\"\$HOME/.local/bin:\$PATH\"' >> ~/.zshrc"
+    fi
+fi
+
+# ─────────────────────────────────────────────────────────────
+# Step 2c: Generate Claude Code sub-agent definitions
+# ─────────────────────────────────────────────────────────────
+
+if [ -x "$KUARK_HOME/bin/generate-claude-agents.sh" ]; then
+    "$KUARK_HOME/bin/generate-claude-agents.sh" >/dev/null 2>&1 && \
+      echo -e "${GREEN}[OK]${NC} Sub-agent definitions installed at $HOME/.claude/agents/kuark-*.md (17 agents)" || \
+      echo -e "${YELLOW}[WARN]${NC} Sub-agent generator failed; run manually: $KUARK_HOME/bin/generate-claude-agents.sh"
+fi
+
+# ─────────────────────────────────────────────────────────────
+# Step 2d: Install slash commands
+# ─────────────────────────────────────────────────────────────
+
+if [ -d "$KUARK_HOME/commands" ]; then
+    mkdir -p "$HOME/.claude/commands"
+    cp "$KUARK_HOME/commands/"*.md "$HOME/.claude/commands/" 2>/dev/null || true
+    cmd_count=$(ls "$KUARK_HOME/commands/"*.md 2>/dev/null | wc -l | tr -d ' ')
+    [ "$cmd_count" -gt 0 ] && echo -e "${GREEN}[OK]${NC} $cmd_count slash command(s) installed at $HOME/.claude/commands/"
+fi
 
 # ─────────────────────────────────────────────────────────────
 # Step 3: Setup Claude Code directory
