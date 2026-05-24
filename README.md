@@ -65,7 +65,7 @@ Claude Code'da `Agent(subagent_type="kuark-<name>", prompt="...")` ile cagrilir.
 | `kuark-security-engineer` | **opus** | Guvenlik audit, RBAC, OWASP |
 | `kuark-devops-engineer` | **opus** | Docker, CI/CD, Railway/Hadron deploy |
 | `kuark-hadron-engineer` | sonnet | Hadron (Dokploy fork) self-hosted PaaS |
-| `kuark-ui-ux-designer` | sonnet | Wireframe, mockup, design system (Pencil MCP) |
+| `kuark-ui-ux-designer` | **opus** | UI/UX tasarım — Tailwind+shadcn kodu yazar (frontend-design skill) |
 | `kuark-api-researcher` | sonnet | 3rd party API arastirma (iyzico, bankalar) |
 | `kuark-documentation` | sonnet | README, API docs, teknik dokumantasyon |
 | `kuark-orchestrator` | sonnet | Multi-agent koordinasyon (genelde main Claude bu rolu yapar) |

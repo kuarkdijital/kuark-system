@@ -35,7 +35,7 @@ done
 # ── Model assignment (opus for code-writing + arch + devops) ──
 model_for() {
   case "$1" in
-    architect|nestjs-developer|nextjs-developer|database-engineer|queue-developer|python-developer|qa-engineer|security-engineer|devops-engineer) echo "opus" ;;
+    architect|nestjs-developer|nextjs-developer|database-engineer|queue-developer|python-developer|qa-engineer|security-engineer|devops-engineer|ui-ux-designer) echo "opus" ;;
     *) echo "sonnet" ;;
   esac
 }
@@ -52,7 +52,7 @@ tools_for() {
     api-researcher)
       echo "Read, Write, Bash, Grep, Glob, WebFetch, WebSearch, TodoWrite" ;;
     ui-ux-designer)
-      echo "Read, Write, Edit, Bash, Grep, Glob, TodoWrite, mcp__pencil__*" ;;
+      echo "Read, Write, Edit, Bash, Grep, Glob, TodoWrite, Skill" ;;
     *)
       echo "Read, Write, Edit, Bash, Grep, Glob, TodoWrite" ;;
   esac
@@ -74,7 +74,7 @@ description_for() {
     security-engineer) echo "Güvenlik audit, RBAC, JWT, OWASP review, vulnerability scan. Use for security audits, auth review, or vulnerability assessment." ;;
     devops-engineer)   echo "Docker, CI/CD, Railway/Nixpacks, deployment, infrastructure. Use for deployment, Docker configuration, CI/CD pipelines, or infrastructure." ;;
     hadron-engineer)   echo "Hadron (Dokploy fork) self-hosted PaaS deploy, hadron-mcp ops. Use for Hadron-specific deployment and infrastructure tasks." ;;
-    ui-ux-designer)    echo "Pencil MCP ile wireframe, mockup, design system, UX akışı. Use when designing UI, creating wireframes, defining design systems, or working with .pen files." ;;
+    ui-ux-designer)    echo "UI tasarımı + design system — frontend-design skill'i ile production-grade Tailwind/shadcn kodu üretir (wireframe değil). Use when designing screens, components, or design systems." ;;
     api-researcher)    echo "3rd party API araştırma, entegrasyon dokümantasyonu (iyzico, banka POS, vb.). Use when researching third-party APIs or planning integrations." ;;
     documentation)     echo "README, API docs, technical documentation yazımı. Use when writing or updating project documentation." ;;
     orchestrator)      echo "Multi-agent koordinasyon, paralel dispatch, handoff yönetimi. Use to coordinate complex multi-agent workflows." ;;

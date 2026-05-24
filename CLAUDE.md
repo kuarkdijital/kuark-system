@@ -135,7 +135,7 @@ Route requests to the appropriate skill module:
 | UI, Tailwind, Radix, shadcn, component, state, styling | `ui` |
 | FastAPI, microservice, Python, Pydantic, async | `python` |
 | architecture, design, ADR, technology, decision, pattern | `architect` |
-| Pencil, .pen, wireframe, mockup, design system, ekran tasarimi | `pencil` |
+| design, tasarim, UI, design system, ekran tasarimi, mockup | `ui` (frontend-design skill) |
 
 ---
 
@@ -159,7 +159,7 @@ Activate specialized agents based on context:
 | Deploy, Docker, Railway | `devops-engineer` |
 | 3rd party API, entegrasyon, iyzico, banka | `api-researcher` |
 | Dokümantasyon, README, API docs | `documentation` |
-| Wireframe, mockup, tasarım, UX, design system, Pencil | `ui-ux-designer` |
+| Tasarım, UI/UX, design system, ekran kodu (Tailwind/shadcn) | `ui-ux-designer` |
 | Python, FastAPI, microservice | `python-developer` |
 
 ---
@@ -377,7 +377,6 @@ export function DataList() {
 | `ui` | ~/.kuark/skills/ui/ | UI components |
 | `python` | ~/.kuark/skills/python/ | Python microservices |
 | `architect` | ~/.kuark/skills/architect/ | Architecture decisions |
-| `pencil` | ~/.kuark/skills/pencil/ | Pencil MCP ile UI tasarimi |
 | `coolify` | skills/coolify/ | Coolify self-hosted deploy |
 
 ---
