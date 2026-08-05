@@ -1,6 +1,7 @@
 # Coolify Skill Module
 
-> Coolify self-hosted PaaS ile deploy, servis yonetimi ve otomasyon
+> **LEGACY** — Kuark resmi self-hosted PaaS hedefi artık **Hadron** (`skills/hadron/`, `kuark-hadron-engineer`).
+> Bu modül yalnızca mevcut Coolify kurulumlarının bakımı için tutulur. Yeni projelerde Hadron kullan.
 
 ## Triggers
 

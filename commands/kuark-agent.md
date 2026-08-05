@@ -7,9 +7,10 @@ argument-hint: <agent-name>
 
 Aktif ajanı `$ARGUMENTS`'taki isime ayarla.
 
-## KRİTİK: Kullanıcı seçimi AskUserQuestion ile
+## KRİTİK: Kullanıcı seçimi — yapılandırılmış girdi
 
-Argüman boşsa kullanıcıya **mutlaka `AskUserQuestion` tool'u ile** sor. Free-text chat sorusu kullanma. Ajan listesini option olarak ver (4'erli gruplar halinde — UI 4 option limit'i var, multiSelect=false). Mantıklı gruplandırma:
+Argüman boşsa platform protokolü ile sor (`user-input-protocol.md`). Free-text yasak.
+Ajan listesini option olarak ver (4'erli gruplar).
 - "Planning & Review": product-owner, project-manager, analyst, architect
 - "Backend & Data": nestjs-developer, database-engineer, queue-developer, python-developer
 - "Frontend & Design": nextjs-developer, ui-ux-designer
@@ -20,16 +21,20 @@ Argüman boşsa kullanıcıya **mutlaka `AskUserQuestion` tool'u ile** sor. Free
 
 ## Adımlar
 
-1. Argüman boşsa: yukarıdaki AskUserQuestion akışını yürüt.
+1. Argüman boşsa: yukarıdaki yapılandırılmış seçim akışını yürüt.
 
 2. `kuark agent set <name>` çalıştır.
 
-3. Önemli: bu sadece ledger event'i. Gerçek iş için **Agent tool ile sub-agent dispatch** yapman gerekir:
+3. Gerçek iş için sub-agent dispatch:
    ```
+   # Claude Code
    Agent(subagent_type="kuark-<name>", prompt="...")
+   # Cursor
+   Task(subagent_type="kuark-<name>", model="<tier-slug>", prompt="...")
    ```
 
-4. Kullanıcıya `AskUserQuestion` ile sor: "Şimdi ne yapmak istersiniz?" options: "Yeni task oluştur", "Mevcut bir task'a devam et", "Sadece durum gör", "Başka bir ajana geç".
+4. Kullanıcıya yapılandırılmış sor: "Şimdi ne yapmak istersiniz?"
+   1) Yeni task oluştur  2) Mevcut task'a devam  3) Sadece durum gör  4) Başka ajana geç
 
 ## Valid Ajanlar
 

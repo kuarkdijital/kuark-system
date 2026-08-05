@@ -5,11 +5,15 @@ argument-hint: [proje-adı]
 
 # /kuark-proje-baslat $ARGUMENTS
 
-Yeni bir Kuark projesi başlat. Sub-agent dispatch zincirini yürüt — sen (main Claude) **orchestrator**'sın ve **tek ledger writer**'sın.
+Yeni bir Kuark projesi başlat. Sub-agent dispatch zincirini yürüt — sen **orchestrator**'sın ve **tek ledger writer**'sın.
 
-## KRİTİK: Tüm kullanıcı soruları AskUserQuestion ile
+## KRİTİK: Yapılandırılmış kullanıcı girdisi
 
-Bu komut boyunca (PO wizard, PM sprint goal, Architect karar onayları, dispatch onayı, vb.) kullanıcıya yöneltilen **her soru `AskUserQuestion` tool'u ile sorulmalı**. Free-text chat soru sorma. 2-4 seçenek ver, "Other" otomatik eklenir. Sub-agent dispatch prompt'larında bu kuralı **açıkça belirt**.
+Platform'a göre (`~/.kuark/references/user-input-protocol.md`):
+- **Claude Code:** her soru `AskUserQuestion` ile
+- **Cursor / Codex:** numaralı `1)` `2)` `3)` `Other)` — free-text chat yasak
+
+Sub-agent prompt'larında bu kuralı **açıkça belirt**.
 
 ## Adım 0: Hazırlık
 
@@ -22,9 +26,9 @@ kuark status
 
 ## Adım 1: Product Owner Dispatch
 
-`kuark-product-owner` sub-agent'ını çağır (Agent tool ile). Prompt:
+`kuark-product-owner` sub-agent'ını çağır (`Agent` / Cursor'da `Task`, model: `composer-2.5-fast`). Prompt:
 
-> Yeni bir Kuark projesi başlatıyoruz. Kullanıcıyla **yalnızca `AskUserQuestion` tool'u ile** etkileşimli wizard yürüt — her adımda 2-4 seçenek sun, asla free-text chat sorusu sorma. "Other" seçeneği otomatik eklenir, kullanıcı serbest cevap vermek isterse onu kullanır. Wizard adımları:
+> Yeni bir Kuark projesi başlatıyoruz. Kullanıcıyla **yalnızca yapılandırılmış seçeneklerle** etkileşimli wizard yürüt (Claude: AskUserQuestion; Cursor/Codex: 1/2/3/Other). Free-text chat sorusu sorma. Wizard adımları:
 >
 > 1. **Vizyon kategorisi**: B2B SaaS / B2C platform / İç araç / E-ticaret / Marketplace
 > 2. **Hedef sektör**: Finans / E-ticaret / Saglık / Eğitim / Lojistik / Diğer
@@ -34,7 +38,7 @@ kuark status
 > 6. **Queue/Background**: BullMQ+Redis (varsayılan) / Hiç / Diğer
 > 7. **Modüller** (multiSelect=true): auth / payment / admin-panel / notifications / file-upload / reporting / billing / api-docs
 > 8. **Ödeme entegrasyonu**: iyzico / Vakıfbank POS / Halkbank POS / Ziraat POS / Yok
-> 9. **Deploy hedefi**: Railway / Hadron self-hosted / Docker (manuel) / Vercel + Railway
+> 9. **Deploy hedefi**: Hadron self-hosted (önerilen) / Railway / Docker (manuel) / Vercel + Railway
 > 10. **MVP scope**: Sadece auth+core / +1 ana feature / Tam featureset
 >
 > Topladığın bilgilerden 5-15 user story üret (US-001, US-002, ...). Her biri:

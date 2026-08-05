@@ -54,7 +54,8 @@ The Orchestrator manages the entire Kuark development workflow by:
 | API integration | api-researcher | nestjs-developer |
 | Tests | qa-engineer | relevant developer |
 | Security audit | security-engineer | - |
-| Deployment | devops-engineer | - |
+| Deployment | devops-engineer | hadron-engineer |
+| Hadron / self-hosted PaaS | hadron-engineer | devops-engineer |
 | Documentation | documentation | - |
 | Python service | python-developer | architect |
 
@@ -72,9 +73,11 @@ The Orchestrator manages the entire Kuark development workflow by:
 "test", "coverage", "QA"                → qa-engineer
 "güvenlik", "auth", "RBAC"              → security-engineer
 "Docker", "deploy", "CI/CD"             → devops-engineer
+"Hadron", "hadron-mcp", "Dokploy"       → hadron-engineer
 "API araştır", "entegrasyon"            → api-researcher
 "dokümantasyon", "README"               → documentation
 "FastAPI", "Python", "microservice"     → python-developer
+"UI", "tasarım", "design system"        → ui-ux-designer
 ```
 
 ## Workflow Orchestration

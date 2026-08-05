@@ -90,16 +90,18 @@ read -r -d '' HANDOFF_PROTOCOL <<'PROTO' || true
 ## Kuark Handoff Protocol (REQUIRED)
 
 You are a **pure sub-agent**. You do NOT write directly to `.swarm/ledger.jsonl` —
-the orchestrator (main Claude) is the single writer. Your responsibilities:
+the orchestrator is the single writer. Your responsibilities:
 
 ### User input rule (CRITICAL)
 
 Whenever you need input from the user — preferences, choices, confirmations,
-clarifications, anything — you **MUST use the `AskUserQuestion` tool** with
-structured options (2–4 choices, an "Other" fallback is added automatically).
+clarifications, anything — follow the **platform user-input protocol**
+(`~/.kuark/references/user-input-protocol.md`):
 
-- Never ask the user free-text questions in chat.
-- For each decision, present 2–4 likely options + let them pick "Other" if none fit.
+- **Claude Code:** use the `AskUserQuestion` tool (2–4 choices, "Other" auto).
+- **Cursor / Codex:** numbered options `1)` `2)` `3)` `Other)` — no unstructured free-text.
+
+- Never ask the user free-text questions in chat (except Other / open-ended creative).
 - Reason: structured UI is faster, prevents typos, produces parseable answers,
   and keeps the wizard consistent across sub-agents.
 

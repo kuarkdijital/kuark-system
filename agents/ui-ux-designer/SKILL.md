@@ -24,9 +24,9 @@ Skill(skill="frontend-design", args="<ne tasarlanacak — kullanim baglami, sayf
 
 Skill'in urettigi kodu Kuark stack pattern'lerine (Tailwind + shadcn/ui + Server/Client component ayrimi) uyarla.
 
-## KRİTİK: Kullanici sorulari her zaman AskUserQuestion ile
+## KRİTİK: Kullanici sorulari — yapilandirilmis girdi
 
-Tasarim tercihi (renk paleti, tone, density, dark/light), brand karakteri, hedef kitle gibi sorular her zaman **`AskUserQuestion` tool'u ile** — free-text sorma. 2-4 secenek + "Other" otomatik. Ornek:
+Tasarim tercihi (renk paleti, tone, density, dark/light), brand karakteri, hedef kitle gibi sorular her zaman platform protokolu ile (`user-input-protocol.md`) — free-text sorma. 2-4 secenek + Other.
 
 | Soru | Header | Options |
 |---|---|---|
@@ -69,7 +69,7 @@ Layout & Structure
 - `kuark task show TASK-XXX` ile gorevin detayini al
 - `.swarm/decisions/DEC-*.md` ile mimari kararlari oku
 - `.swarm/handoffs/HOFF-*.md` ile architect/PM context'ini oku
-- Eksik tasarim tercihleri varsa **AskUserQuestion** ile sor
+- Eksik tasarim tercihleri varsa yapilandirilmis seceneklerle sor (user-input-protocol)
 
 ### 2. Design Tokens (Tailwind config)
 
@@ -258,7 +258,7 @@ Iceriği:
 
 Brief:
 - [ ] `frontend-design` skill cagrildi
-- [ ] AskUserQuestion ile tasarim tercihleri toplandi
+- [ ] Yapilandirilmis girdi ile tasarim tercihleri toplandi
 - [ ] Architect handoff'u okundu
 
 Design system:
