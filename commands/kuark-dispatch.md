@@ -7,35 +7,33 @@ argument-hint: <TASK-ID> [TASK-ID...]
 
 Bir veya daha fazla task'ı paralel sub-agent dispatch ile çalıştır.
 
-## KRİTİK: Kullanıcı seçimi AskUserQuestion ile
+## KRİTİK: Kullanıcı seçimi — yapılandırılmış girdi
 
-Argüman boşsa, dispatch öncesi onay, bağımlılık çözümü gibi tüm kullanıcı etkileşimleri **`AskUserQuestion` tool'u ile**. Free-text chat sorusu yasak. Task seçiminde `multiSelect: true` kullan (birden çok task seçilebilsin), options olarak `kuark tasks --status planned` çıktısından TASK-ID + title pair'leri ver.
+Argüman boşsa, dispatch öncesi onay vb. için platform protokolünü kullan (`user-input-protocol.md`):
+Claude → `AskUserQuestion`; Cursor/Codex → numaralı seçenekler. Free-text yasak.
+Task seçiminde mümkünse multi-select; options olarak `kuark tasks --status planned` çıktısından TASK-ID + title ver.
 
 ## Adımlar
 
 1. **Argümanları parse et**: Boşluk-ayraçlı TASK-ID listesi. Boşsa:
    - `kuark tasks --status planned` çıktısını oku
-   - `AskUserQuestion` ile (multiSelect=true) hangi task'ların dispatch edileceğini seçtir
-   - Her option: label="TASK-XXX: <title kısaltma>", description="assignee, priority"
+   - Yapılandırılmış multi-select ile task seçtir (Claude: AskUserQuestion; Cursor: numaralı liste)
+   - Her option: `TASK-XXX: <title>` + assignee/priority
 
 2. **Her task için**:
    - `kuark task show TASK-XXX` ile assignee + detayları al
    - Önceki handoff DRAFT'ı varsa oku, yoksa task ile birlikte yeni context inşa et
    - Task'ı `in-progress` yap: `kuark task update TASK-XXX in-progress`
 
-3. **Paralel dispatch** (TÜM Agent tool çağrılarını **aynı mesajda** yap):
+3. **Paralel dispatch** (tüm çağrıları **aynı mesajda** yap):
    ```
-   Agent(subagent_type="kuark-<assignee1>", prompt="""
-     TASK-XXX: <title>
-     Handoff payload: .swarm/handoffs/HOFF-DRAFT-...md (eğer varsa)
-     Architectural decisions: .swarm/decisions/DEC-*.md (ilgili olanları oku)
-     Project context: .swarm/views/dashboard.md
-
-     Görevin: task'ı baştan sona tamamla. Bitirince DRAFT handoff yaz.
-   """)
-   Agent(subagent_type="kuark-<assignee2>", prompt="...")
-   ...
+   # Claude Code
+   Agent(subagent_type="kuark-<assignee1>", prompt="TASK-XXX: ...")
+   # Cursor (model tier: high=Grok, fast=composer)
+   Task(subagent_type="kuark-<assignee1>", model="cursor-grok-4.5-high-fast", prompt="TASK-XXX: ...")
    ```
+   Prompt'ta ver: title, HOFF-DRAFT path, ilgili DEC-*.md, dashboard.md.
+   Bitince DRAFT handoff yazmasını iste. Bağımsız task'lar için birden fazla çağrıyı aynı turn'de yap.
 
 4. **Dönen sonuçlar için**:
    - Her sub-agent DRAFT handoff/decisions yazmış olmalı

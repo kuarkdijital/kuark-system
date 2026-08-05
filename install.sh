@@ -1,108 +1,95 @@
 #!/bin/bash
 # Kuark Universal Development System - Global Installer
-# Installs kuark-system globally for Claude Code
+# Installs for Cursor + Claude Code + Codex (equal platforms)
 #
 # Usage:
-#   curl -sSL https://raw.githubusercontent.com/kuarkdijital/kuark-system/main/install.sh | bash
-#   OR
-#   bash install.sh
+#   bash install.sh                          # from local checkout (preferred)
+#   curl -sSL .../install.sh | bash          # from GitHub
 
 set -e
 
-# ─────────────────────────────────────────────────────────────
-# Configuration
-# ─────────────────────────────────────────────────────────────
-
 KUARK_HOME="$HOME/.kuark"
 CLAUDE_HOME="$HOME/.claude"
+CURSOR_HOME="$HOME/.cursor"
 REPO_URL="https://github.com/kuarkdijital/kuark-system.git"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd || true)"
 
-# Markers for CLAUDE.md injection
 MARKER_START="<!-- KUARK-SYSTEM-START -->"
 MARKER_END="<!-- KUARK-SYSTEM-END -->"
 
-# Colors
 GREEN='\033[0;32m'
 RED='\033[0;31m'
 CYAN='\033[0;36m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
-# ─────────────────────────────────────────────────────────────
-# Prerequisites
-# ─────────────────────────────────────────────────────────────
-
 echo -e "${CYAN}[KUARK]${NC} Installing Kuark Universal Development System..."
+echo -e "${CYAN}[KUARK]${NC} Targets: Cursor · Claude Code · Codex"
 echo ""
 
-# Check for git
+# ── Prerequisites ────────────────────────────────────────────
+
 if ! command -v git &> /dev/null; then
-    echo -e "${RED}[ERROR]${NC} git is required but not installed."
-    echo "  macOS: xcode-select --install"
-    echo "  Linux: sudo apt-get install git"
+    echo -e "${RED}[ERROR]${NC} git is required."
     exit 1
 fi
 
-# Check for jq
 if ! command -v jq &> /dev/null; then
-    echo -e "${YELLOW}[WARN]${NC} jq is not installed. Attempting to install..."
-    if [[ "$OSTYPE" == "darwin"* ]]; then
-        if command -v brew &> /dev/null; then
-            brew install jq 2>/dev/null || {
-                echo -e "${RED}[ERROR]${NC} Failed to install jq. Install manually: brew install jq"
-                exit 1
-            }
-        else
-            echo -e "${RED}[ERROR]${NC} Homebrew not found. Install jq manually: brew install jq"
-            exit 1
-        fi
+    echo -e "${YELLOW}[WARN]${NC} jq missing — attempting install..."
+    if [[ "$OSTYPE" == "darwin"* ]] && command -v brew &> /dev/null; then
+        brew install jq 2>/dev/null || { echo -e "${RED}[ERROR]${NC} Install jq: brew install jq"; exit 1; }
     elif command -v apt-get &> /dev/null; then
-        sudo apt-get install -y jq 2>/dev/null || {
-            echo -e "${RED}[ERROR]${NC} Failed to install jq. Install manually: sudo apt-get install jq"
-            exit 1
-        }
-    elif command -v yum &> /dev/null; then
-        sudo yum install -y jq 2>/dev/null || {
-            echo -e "${RED}[ERROR]${NC} Failed to install jq. Install manually: sudo yum install jq"
-            exit 1
-        }
+        sudo apt-get install -y jq 2>/dev/null || { echo -e "${RED}[ERROR]${NC} Install jq manually"; exit 1; }
     else
-        echo -e "${RED}[ERROR]${NC} Cannot auto-install jq. Please install it manually."
-        exit 1
+        echo -e "${RED}[ERROR]${NC} Install jq manually."; exit 1
     fi
-    echo -e "${GREEN}[OK]${NC} jq installed"
 fi
-
 echo -e "${GREEN}[OK]${NC} Prerequisites satisfied"
 
-# ─────────────────────────────────────────────────────────────
-# Step 1: Clone or update repository
-# ─────────────────────────────────────────────────────────────
+# ── Step 1: Populate ~/.kuark ────────────────────────────────
 
-if [ -d "$KUARK_HOME" ]; then
-    echo -e "${CYAN}[KUARK]${NC} Existing installation found. Updating..."
+sync_from_local() {
+    local src="$1"
+    mkdir -p "$KUARK_HOME"
+    # Prefer rsync; fall back to tar
+    if command -v rsync &> /dev/null; then
+        rsync -a --delete \
+            --exclude '.git' \
+            --exclude '.DS_Store' \
+            --exclude '.swarm' \
+            --exclude '.claude/worktrees' \
+            --exclude 'team-stats' \
+            "$src/" "$KUARK_HOME/"
+    else
+        (cd "$src" && tar cf - \
+            --exclude '.git' --exclude '.DS_Store' --exclude '.swarm' \
+            --exclude '.claude/worktrees' --exclude 'team-stats' .) \
+            | (cd "$KUARK_HOME" && tar xf -)
+    fi
+}
+
+if [ -n "$SCRIPT_DIR" ] && [ -f "$SCRIPT_DIR/CLAUDE.md" ] && [ -d "$SCRIPT_DIR/agents" ]; then
+    echo -e "${CYAN}[KUARK]${NC} Syncing from local checkout: $SCRIPT_DIR"
+    sync_from_local "$SCRIPT_DIR"
+    echo -e "${GREEN}[OK]${NC} ~/.kuark synced from local repo"
+elif [ -d "$KUARK_HOME/.git" ]; then
+    echo -e "${CYAN}[KUARK]${NC} Updating existing install from origin/main..."
     cd "$KUARK_HOME"
     git fetch origin main 2>/dev/null
     git reset --hard origin/main 2>/dev/null
     echo -e "${GREEN}[OK]${NC} Repository updated"
 else
-    echo -e "${CYAN}[KUARK]${NC} Cloning kuark-system to $KUARK_HOME..."
+    echo -e "${CYAN}[KUARK]${NC} Cloning to $KUARK_HOME..."
     git clone "$REPO_URL" "$KUARK_HOME" 2>/dev/null
     echo -e "${GREEN}[OK]${NC} Repository cloned"
 fi
 
-# ─────────────────────────────────────────────────────────────
-# Step 2: Make scripts executable
-# ─────────────────────────────────────────────────────────────
-
 chmod +x "$KUARK_HOME"/hooks/*.sh 2>/dev/null || true
 chmod +x "$KUARK_HOME"/kuark 2>/dev/null || true
 chmod +x "$KUARK_HOME"/bin/*.sh 2>/dev/null || true
-echo -e "${GREEN}[OK]${NC} Scripts made executable"
+echo -e "${GREEN}[OK]${NC} Scripts executable"
 
-# ─────────────────────────────────────────────────────────────
-# Step 2b: Install `kuark` CLI on PATH
-# ─────────────────────────────────────────────────────────────
+# ── Step 2: kuark CLI on PATH ────────────────────────────────
 
 KUARK_BIN_SRC="$KUARK_HOME/kuark"
 KUARK_BIN_INSTALLED=""
@@ -110,78 +97,43 @@ for target in "$HOME/.local/bin" "/usr/local/bin"; do
     if [ -d "$target" ] && [ -w "$target" ]; then
         ln -sf "$KUARK_BIN_SRC" "$target/kuark"
         KUARK_BIN_INSTALLED="$target/kuark"
-        echo -e "${GREEN}[OK]${NC} kuark CLI symlinked: $KUARK_BIN_INSTALLED"
+        echo -e "${GREEN}[OK]${NC} kuark CLI: $KUARK_BIN_INSTALLED"
         break
     fi
 done
-
 if [ -z "$KUARK_BIN_INSTALLED" ]; then
-    # Create ~/.local/bin if missing (very common pattern)
-    if [ ! -d "$HOME/.local/bin" ]; then
-        mkdir -p "$HOME/.local/bin"
-        ln -sf "$KUARK_BIN_SRC" "$HOME/.local/bin/kuark"
-        KUARK_BIN_INSTALLED="$HOME/.local/bin/kuark"
-        echo -e "${GREEN}[OK]${NC} Created $HOME/.local/bin and symlinked kuark there"
-        echo -e "${YELLOW}[NOTE]${NC} Ensure \$HOME/.local/bin is on your PATH:"
-        echo -e "         echo 'export PATH=\"\$HOME/.local/bin:\$PATH\"' >> ~/.zshrc"
+    mkdir -p "$HOME/.local/bin"
+    ln -sf "$KUARK_BIN_SRC" "$HOME/.local/bin/kuark"
+    KUARK_BIN_INSTALLED="$HOME/.local/bin/kuark"
+    echo -e "${GREEN}[OK]${NC} kuark CLI: $KUARK_BIN_INSTALLED"
+    echo -e "${YELLOW}[NOTE]${NC} Ensure ~/.local/bin is on PATH"
+fi
+
+# ── inject_marked_file helper ────────────────────────────────
+
+inject_marked_file() {
+    local dest="$1"
+    local source_md="$2"
+    local label="$3"
+
+    if [ ! -f "$source_md" ]; then
+        echo -e "${YELLOW}[WARN]${NC} Missing $source_md — skip $label"
+        return 0
     fi
-fi
 
-# ─────────────────────────────────────────────────────────────
-# Step 2c: Generate Claude Code sub-agent definitions
-# ─────────────────────────────────────────────────────────────
+    SECTION_TMP=$(mktemp)
+    {
+        echo "$MARKER_START"
+        echo "# Kuark Universal Development System (Auto-injected)"
+        echo "# Source: $source_md | Do not edit between markers"
+        echo "# Update: bash ~/.kuark/update.sh | Remove: bash ~/.kuark/uninstall.sh"
+        echo ""
+        cat "$source_md"
+        echo "$MARKER_END"
+    } > "$SECTION_TMP"
 
-if [ -x "$KUARK_HOME/bin/generate-claude-agents.sh" ]; then
-    "$KUARK_HOME/bin/generate-claude-agents.sh" >/dev/null 2>&1 && \
-      echo -e "${GREEN}[OK]${NC} Sub-agent definitions installed at $HOME/.claude/agents/kuark-*.md (17 agents)" || \
-      echo -e "${YELLOW}[WARN]${NC} Sub-agent generator failed; run manually: $KUARK_HOME/bin/generate-claude-agents.sh"
-fi
-
-# ─────────────────────────────────────────────────────────────
-# Step 2d: Install slash commands
-# ─────────────────────────────────────────────────────────────
-
-if [ -d "$KUARK_HOME/commands" ]; then
-    mkdir -p "$HOME/.claude/commands"
-    cp "$KUARK_HOME/commands/"*.md "$HOME/.claude/commands/" 2>/dev/null || true
-    cmd_count=$(ls "$KUARK_HOME/commands/"*.md 2>/dev/null | wc -l | tr -d ' ')
-    [ "$cmd_count" -gt 0 ] && echo -e "${GREEN}[OK]${NC} $cmd_count slash command(s) installed at $HOME/.claude/commands/"
-fi
-
-# ─────────────────────────────────────────────────────────────
-# Step 3: Setup Claude Code directory
-# ─────────────────────────────────────────────────────────────
-
-mkdir -p "$CLAUDE_HOME"
-mkdir -p "$CLAUDE_HOME/memory/kuark"
-
-# ─────────────────────────────────────────────────────────────
-# Step 4: Inject CLAUDE.md into ~/.claude/CLAUDE.md
-# ─────────────────────────────────────────────────────────────
-
-CLAUDE_MD="$CLAUDE_HOME/CLAUDE.md"
-KUARK_CLAUDE_MD="$KUARK_HOME/CLAUDE.md"
-
-if [ ! -f "$KUARK_CLAUDE_MD" ]; then
-    echo -e "${RED}[ERROR]${NC} CLAUDE.md not found in kuark-system"
-    exit 1
-fi
-
-# Build the kuark section in a temp file
-SECTION_TMP=$(mktemp)
-{
-    echo "$MARKER_START"
-    echo "# Kuark Universal Development System (Auto-injected)"
-    echo "# Source: ~/.kuark/CLAUDE.md | Do not edit between markers"
-    echo "# Update: bash ~/.kuark/update.sh | Remove: bash ~/.kuark/uninstall.sh"
-    echo ""
-    cat "$KUARK_CLAUDE_MD"
-    echo "$MARKER_END"
-} > "$SECTION_TMP"
-
-if [ -f "$CLAUDE_MD" ]; then
-    if grep -q "$MARKER_START" "$CLAUDE_MD" 2>/dev/null; then
-        # Replace existing kuark section using python3 (handles multi-line safely)
+    mkdir -p "$(dirname "$dest")"
+    if [ -f "$dest" ] && grep -q "$MARKER_START" "$dest" 2>/dev/null; then
         python3 -c "
 import sys
 ms, me = sys.argv[1], sys.argv[2]
@@ -190,35 +142,42 @@ section = open(sys.argv[4]).read()
 i = content.index(ms)
 j = content.index(me) + len(me)
 open(sys.argv[3], 'w').write(content[:i] + section + content[j:])
-" "$MARKER_START" "$MARKER_END" "$CLAUDE_MD" "$SECTION_TMP"
-        echo -e "${GREEN}[OK]${NC} CLAUDE.md updated (existing kuark section replaced)"
+" "$MARKER_START" "$MARKER_END" "$dest" "$SECTION_TMP"
+        echo -e "${GREEN}[OK]${NC} $label updated (section replaced)"
+    elif [ -f "$dest" ]; then
+        echo "" >> "$dest"
+        cat "$SECTION_TMP" >> "$dest"
+        echo -e "${GREEN}[OK]${NC} $label updated (section appended)"
     else
-        # Append to existing file
-        echo "" >> "$CLAUDE_MD"
-        cat "$SECTION_TMP" >> "$CLAUDE_MD"
-        echo -e "${GREEN}[OK]${NC} CLAUDE.md updated (kuark section appended)"
+        cp "$SECTION_TMP" "$dest"
+        echo -e "${GREEN}[OK]${NC} $label created"
     fi
-else
-    cp "$SECTION_TMP" "$CLAUDE_MD"
-    echo -e "${GREEN}[OK]${NC} CLAUDE.md created"
-fi
-rm -f "$SECTION_TMP"
+    rm -f "$SECTION_TMP"
+}
 
-# ─────────────────────────────────────────────────────────────
-# Step 5: Merge hooks into ~/.claude/settings.json
-# ─────────────────────────────────────────────────────────────
+# ── Step 3: Claude Code agents + commands + CLAUDE.md + hooks ─
+
+if [ -x "$KUARK_HOME/bin/generate-claude-agents.sh" ]; then
+    "$KUARK_HOME/bin/generate-claude-agents.sh" >/dev/null 2>&1 && \
+      echo -e "${GREEN}[OK]${NC} Claude sub-agents → ~/.claude/agents/kuark-*.md" || \
+      echo -e "${YELLOW}[WARN]${NC} generate-claude-agents.sh failed"
+fi
+
+if [ -d "$KUARK_HOME/commands" ]; then
+    mkdir -p "$HOME/.claude/commands"
+    cp "$KUARK_HOME/commands/"*.md "$HOME/.claude/commands/" 2>/dev/null || true
+    cmd_count=$(ls "$KUARK_HOME/commands/"*.md 2>/dev/null | wc -l | tr -d ' ')
+    [ "$cmd_count" -gt 0 ] && echo -e "${GREEN}[OK]${NC} $cmd_count Claude slash commands installed"
+fi
+
+mkdir -p "$CLAUDE_HOME/memory/kuark"
+inject_marked_file "$CLAUDE_HOME/CLAUDE.md" "$KUARK_HOME/CLAUDE.md" "Claude CLAUDE.md"
 
 SETTINGS_FILE="$CLAUDE_HOME/settings.json"
 HOOKS_SOURCE="$KUARK_HOME/.claude-hooks.json"
-
-if [ ! -f "$HOOKS_SOURCE" ]; then
-    echo -e "${YELLOW}[WARN]${NC} .claude-hooks.json not found. Skipping hooks setup."
-else
+if [ -f "$HOOKS_SOURCE" ]; then
     if [ -f "$SETTINGS_FILE" ]; then
-        # Check if kuark hooks already exist
         if grep -q "kuark" "$SETTINGS_FILE" 2>/dev/null; then
-            # Remove existing kuark hooks first, then re-add
-            # Use jq to filter out kuark hooks from each event
             CLEANED=$(jq '
                 if .hooks then
                     .hooks |= with_entries(
@@ -231,8 +190,6 @@ else
             echo "$CLEANED" > "$SETTINGS_FILE.tmp"
             mv "$SETTINGS_FILE.tmp" "$SETTINGS_FILE"
         fi
-
-        # Merge kuark hooks into settings
         KUARK_HOOKS=$(cat "$HOOKS_SOURCE")
         jq -s '
             (.[0] // {}) as $existing |
@@ -249,55 +206,75 @@ else
                 )
             }
         ' "$SETTINGS_FILE" <(echo "$KUARK_HOOKS") > "$SETTINGS_FILE.tmp" 2>/dev/null
-
         if [ -s "$SETTINGS_FILE.tmp" ]; then
             mv "$SETTINGS_FILE.tmp" "$SETTINGS_FILE"
-            echo -e "${GREEN}[OK]${NC} Hooks merged into existing settings.json"
+            echo -e "${GREEN}[OK]${NC} Claude hooks merged"
         else
             rm -f "$SETTINGS_FILE.tmp"
-            # Fallback: just add hooks key
             jq --argjson hooks "$(jq '.hooks' "$HOOKS_SOURCE")" '.hooks = $hooks' "$SETTINGS_FILE" > "$SETTINGS_FILE.tmp" 2>/dev/null
             mv "$SETTINGS_FILE.tmp" "$SETTINGS_FILE"
-            echo -e "${GREEN}[OK]${NC} Hooks added to settings.json"
+            echo -e "${GREEN}[OK]${NC} Claude hooks set"
         fi
     else
-        # No existing settings - create from hooks source with existing permissions pattern
         echo '{}' | jq --argjson hooks "$(jq '.hooks' "$HOOKS_SOURCE")" '. + {hooks: $hooks}' > "$SETTINGS_FILE"
-        echo -e "${GREEN}[OK]${NC} settings.json created with kuark hooks"
+        echo -e "${GREEN}[OK]${NC} Claude settings.json created"
     fi
+else
+    echo -e "${YELLOW}[WARN]${NC} .claude-hooks.json missing — skip hooks"
 fi
 
-# ─────────────────────────────────────────────────────────────
-# Step 6: Record version
-# ─────────────────────────────────────────────────────────────
+# ── Step 4: Cursor skills + rule + AGENTS.md ─────────────────
+
+if [ -x "$KUARK_HOME/bin/generate-cursor-agents.sh" ]; then
+    "$KUARK_HOME/bin/generate-cursor-agents.sh" >/dev/null 2>&1 && \
+      echo -e "${GREEN}[OK]${NC} Cursor skills → ~/.cursor/skills/kuark-*/" || \
+      echo -e "${YELLOW}[WARN]${NC} generate-cursor-agents.sh failed"
+fi
+
+mkdir -p "$CURSOR_HOME/rules"
+if [ -f "$KUARK_HOME/templates/cursor/kuark.mdc" ]; then
+    cp "$KUARK_HOME/templates/cursor/kuark.mdc" "$CURSOR_HOME/rules/kuark.mdc"
+    echo -e "${GREEN}[OK]${NC} Cursor rule → ~/.cursor/rules/kuark.mdc"
+fi
+
+# Cursor / Codex share ~/AGENTS.md
+AGENTS_SRC="$KUARK_HOME/AGENTS.md"
+[ -f "$AGENTS_SRC" ] || AGENTS_SRC="$KUARK_HOME/CLAUDE.md"
+inject_marked_file "$HOME/AGENTS.md" "$AGENTS_SRC" "~/AGENTS.md (Cursor/Codex)"
+
+# Optional project-level rule copy hint is in README; global rule is enough
+
+# ── Step 5: Codex note (AGENTS.md already injected) ──────────
+
+echo -e "${GREEN}[OK]${NC} Codex: uses ~/AGENTS.md + kuark CLI (same v2 protocol)"
+
+# ── Version ──────────────────────────────────────────────────
 
 cd "$KUARK_HOME"
-git rev-parse HEAD > "$KUARK_HOME/version.txt" 2>/dev/null || echo "local" > "$KUARK_HOME/version.txt"
+if git rev-parse HEAD >/dev/null 2>&1; then
+    git rev-parse HEAD > "$KUARK_HOME/version.txt"
+else
+    date -u +"%Y-%m-%dT%H:%M:%SZ-local" > "$KUARK_HOME/version.txt"
+fi
 
-# ─────────────────────────────────────────────────────────────
-# Done
-# ─────────────────────────────────────────────────────────────
+AGENT_COUNT=$(ls -d "$KUARK_HOME"/agents/*/ 2>/dev/null | wc -l | tr -d ' ')
 
 echo ""
 echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${GREEN}[KUARK]${NC} Installation complete!"
 echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
-echo -e "  ${CYAN}Installation:${NC}  $KUARK_HOME"
-echo -e "  ${CYAN}Claude MD:${NC}     $CLAUDE_MD"
-echo -e "  ${CYAN}Settings:${NC}      $SETTINGS_FILE"
-echo -e "  ${CYAN}Memory:${NC}        $CLAUDE_HOME/memory/kuark/"
+echo -e "  ${CYAN}Install:${NC}       $KUARK_HOME"
+echo -e "  ${CYAN}CLI:${NC}           $KUARK_BIN_INSTALLED"
+echo -e "  ${CYAN}Agents:${NC}        $AGENT_COUNT (hadron dahil)"
+echo -e "  ${CYAN}Claude MD:${NC}     $CLAUDE_HOME/CLAUDE.md"
+echo -e "  ${CYAN}AGENTS.md:${NC}     $HOME/AGENTS.md"
+echo -e "  ${CYAN}Cursor rule:${NC}   $CURSOR_HOME/rules/kuark.mdc"
+echo -e "  ${CYAN}Cursor skills:${NC} $CURSOR_HOME/skills/kuark-*/"
 echo ""
-echo -e "  ${CYAN}Agents:${NC}        16 specialized AI agents"
-echo -e "  ${CYAN}Hooks:${NC}         SessionStart, PreToolUse, PostToolUse, Stop"
-echo -e "  ${CYAN}Skills:${NC}        NestJS, NextJS, Prisma, Queue, DevOps, Security, API, UI, Python, Architect"
+echo -e "  ${CYAN}Deploy target:${NC} Hadron (Coolify legacy)"
+echo -e "  ${CYAN}Cursor models:${NC} code/ADR → cursor-grok-4.5-high-fast | plan → composer-2.5-fast"
 echo ""
-echo -e "  ${YELLOW}Usage:${NC}"
-echo -e "    Start Claude Code in any project directory."
-echo -e "    The swarm system will auto-initialize."
-echo -e "    Say 'proje baslat' to begin a new project."
-echo ""
-echo -e "  ${YELLOW}Commands:${NC}"
-echo -e "    Update:    bash ~/.kuark/update.sh"
-echo -e "    Uninstall: bash ~/.kuark/uninstall.sh"
+echo -e "  ${YELLOW}Usage:${NC}  'proje baslat' | /kuark-proje-baslat | kuark status"
+echo -e "  ${YELLOW}Update:${NC} bash ~/.kuark/update.sh  (or bash install.sh from checkout)"
 echo ""

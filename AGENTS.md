@@ -1,9 +1,12 @@
-# Kuark Universal Development System - Core Directives
+# Kuark Universal Development System - Core Directives (AGENTS.md)
 
-> Kuark şirketine özel multi-agent development sistemi
+> Cursor + Codex + Claude Code için ortak enjekte edilen direktifler
 > Platforms (eşit): **Cursor** · **Claude Code** · **Codex**
-> Installation: ~/.kuark/ | Reference: ~/.kuark/CONVENTIONS.md
+> Installation: ~/.kuark/ | Senkron: CLAUDE.md ile aynı gövde
 > User input: ~/.kuark/references/user-input-protocol.md
+
+**Cursor:** `Task(subagent_type="kuark-<name>", model=...)` — kod/ADR → `cursor-grok-4.5-high-fast`, planlama → `composer-2.5-fast`.
+**Codex:** aynı v2 ledger; legacy role-play / backlog.json elle yazma yok.
 
 ---
 
